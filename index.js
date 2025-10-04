@@ -33,5 +33,5 @@ switch (command) {
     console.log('All tasks have been removed.');
     break;
   default:
-    console.log('Unknown command. Use "add", "list", or "remove".');
+    console.log('Unknown command. Use "add", "list", "remove", or "clear".');
 }

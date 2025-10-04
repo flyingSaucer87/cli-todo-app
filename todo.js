@@ -48,6 +48,12 @@ function removeTodo(index) {
   }
 }
 
+// Clear all tasks
+function clearTodos() {
+  todos = [];
+  saveTodos();
+}
+
 // Initialize tasks on startup
 loadTodos();
 
