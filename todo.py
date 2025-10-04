@@ -18,10 +18,77 @@ def save_todos(todos):
     with open(FILE_PATH, "w") as f:
         json.dump(todos, f, indent=2)
 
-# Add a new task with optional priority and tags
-def add_todo(task, priority="Medium", tags=None):
-# Add a new task with optional priority
-def add_todo(task, priority="Medium"):
+def parse_recurrence(recurrence_str):
+    if not recurrence_str:
+        return None
+    
+    legacy_map = {
+        "daily": {"interval": 1, "unit": "d"},
+        "weekly": {"interval": 1, "unit": "w"},
+        "monthly": {"interval": 1, "unit": "m"}
+    }
+
+    if recurrence_str in legacy_map:
+        return legacy_map[recurrence_str]
+    
+    if len(recurrence_str) >= 2 and recurrence_str[-1] in ['d', 'w', 'm']:
+        try:
+            interval = int(recurrence_str[:-1])
+            unit = recurrence_str[-1]
+            if interval > 0:
+                return {"interval": interval, "unit": unit}
+        except ValueError:
+            pass
+    
+    return None
+
+def format_recurrence(recurrence):
+    if not recurrence:
+        return "None"
+    
+    if isinstance(recurrence, str):
+        return recurrence
+    
+    unit_names = {"d": "day", "w": "week", "m": "month"}
+    interval = recurrence.get("interval", 1)
+    unit = recurrence.get("unit", "d")
+    unit_name = unit_names.get(unit, "day")
+    
+    if interval > 1:
+        unit_name += "s"
+    
+    return f"Every {interval} {unit_name}"
+
+def calculate_next_due(due_date, recurrence):
+    if isinstance(due_date, str):
+        due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
+    else:
+        due_date_obj = due_date
+
+    if not recurrence or not isinstance(recurrence, dict):
+        return due_date_obj.strftime("%Y-%m-%d")
+    
+    interval = recurrence.get("interval", 1)
+    unit = recurrence.get("unit", "d")
+
+    if unit == "d":
+        next_date = due_date_obj + timedelta(days=interval)
+    elif unit == "w":
+        next_date = due_date_obj + timedelta(weeks=interval)
+    elif unit == "m":
+        # Handle month addition
+        month = due_date_obj.month - 1 + interval
+        year = due_date_obj.year + month // 12
+        month = month % 12 + 1
+        day = min(due_date_obj.day, [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        next_date = datetime(year, month, day).date()
+    else:
+        next_date = due_date_obj
+    
+    return next_date.strftime("%Y-%m-%d")
+
+# Add a new task with optional priority, tags, due_date, recurrence
+def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None):
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -31,36 +98,42 @@ def add_todo(task, priority="Medium"):
         tags = []
 
     todos = load_todos()
-    todos.append({"task": task, "priority": priority, "tags": tags})
-    save_todos(todos)
-    print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
-    todos = load_todos()
-    todos.append({"task": task, "priority": priority})
-    save_todos(todos)
-    print(f"✅ Added: {task} [Priority: {priority}]")
+    due_date_obj = None
 
-# Add a new task
-def add_todo(task, due_date=None):
-    todos = load_todos()
-    
     # If due date is provided, ensure it is a string in the format YYYY-MM-DD
     if due_date:
         try:
-            due_date = datetime.strptime(due_date, "%Y-%m-%d").date()  # Convert string to date
+            due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()  # Convert string to date
         except ValueError:
             print("Invalid date format. Please use YYYY-MM-DD.")
             return
+        
+    recurrence_obj = parse_recurrence(recurrence)
+    if recurrence and not recurrence_obj:
+        print(f"Invalid recurrence format. Use: daily, weekly, monthly, or custom (e.g., 3d, 2w, 1m)")
+        return
     
-    todos.append({"task": task, "due_date": due_date})  # Add task with due date
+    # Add task with optional recurrence and due date
+    task_obj = {
+        "task": task,
+        "priority": priority,
+        "tags": tags,
+        "due_date": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
+        "recurrence": recurrence_obj,
+        "next_due": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None
+    }
+    
+    todos.append(task_obj)
     save_todos(todos)
-    print(f"✅ Added: {task}, Due: {due_date if due_date else 'No due date'}")
 
-def list_todos(filter_tag=None, sort_by=None):
+    tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
+    due_str = f"[Due: {due_date_obj.strftime('%Y-%m-%d')}]" if due_date_obj else ""
+    rec_str = f"[Recurrence: {format_recurrence(recurrence_obj)}]" if recurrence_obj else ""
+
+    print(f"✅ Added: {task} [Priority: {priority}] {tags_str} {due_str} {rec_str}".strip())
 
 # List all tasks sorted by priority and optionally filtered by tag
-def list_todos(filter_tag=None):
-  
-def list_todos(filter_tag=None):
+def list_todos(filter_tag=None, sort_by=None):
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
@@ -68,6 +141,9 @@ def list_todos(filter_tag=None):
 
     if filter_tag:
         todos = [t for t in todos if filter_tag in t.get("tags", [])]
+        if not todos:
+            print(f"No tasks found with tag '{filter_tag}'.")
+            return
 
     if sort_by == "name":
         todos.sort(key=lambda x: x.get("task", "").lower())
@@ -79,11 +155,15 @@ def list_todos(filter_tag=None):
 
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
-        due = task.get("due", "N/A")
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}]")
-        due_date_str = task["due_date"].strftime("%Y-%m-%d") if task["due_date"] else "No due date"
-        next_due_str = task["next_due"] if task["next_due"] else "No recurrence"
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due_date_str}] [Next Due: {next_due_str}] [Recurrence: {task['recurrence'] if task['recurrence'] else 'None'}]")
+        tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
+        
+        due_date = task.get("due_date")
+        due_str = f"[Due: {due_date}]" if due_date else "[Due: None]"
+        
+        recurrence = task.get("recurrence")
+        rec_str = f"[Recurrence: {format_recurrence(recurrence)}]"
+        
+        print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str}")
 
 # Search tasks by text or tag
 def search_todos(search_term):
@@ -122,25 +202,11 @@ def remove_todo(index):
 
         # List the remaining tasks
         for i, task in enumerate(todos):
-            due_date_str = task["due_date"].strftime("%Y-%m-%d") if task["due_date"] else "No due date"
+            due_date_str = task["due_date"] if task["due_date"] else "No due date"
             print(f"{i}: {task['task']} (Due: {due_date_str})")
     else:
         print("Invalid task index.")
 
-# Remove a task by index
-def remove_todo(index):
-    todos = load_todos()
-    if 0 <= index < len(todos):
-        removed = todos.pop(index)
-        save_todos(todos)
-        print(f"🗑️ Removed: {removed['task']} [Priority: {removed['priority']}]")
-        
-    # Check for tasks due today
-    check_due_tasks(todos)
-    
-    for i, task in enumerate(todos):
-        due_date_str = task["due_date"].strftime("%Y-%m-%d") if task["due_date"] else "No due date"
-        print(f"{i}: {task['task']} (Due: {due_date_str})")
 
 # Check and notify if any tasks are due today
 def check_due_tasks(todos):
@@ -176,13 +242,30 @@ def calculate_next_due(due_date, recurrence):
         return next_month.strftime("%Y-%m-%d")
     else:
         return due_date
+    
+# Edit a task by index
+def edit_todo(index, new_description):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        old_task = todos[index]
+        todos[index]['task'] = new_description
+        save_todos(todos)
+        print(f" Updated task {index}:")
+        print(f"   Old: {old_task}")
+        print(f"   New: {todos[index]}")
+    else:
+        print("Invalid task index.")
 
 # Command-line interface
 def main():
-     if len(sys.argv) < 2:
+    if len(sys.argv) < 2:
         print("Usage:")
-        print("  python todo.py add \"Task name\" [--priority High|Medium|Low] [--due YYYY-MM-DD] [--recurrence daily|weekly|monthly]")
-        print("  python todo.py list [--tag work]")
+        print("  python todo.py add \"Task name\" [--priority High|Medium|Low] [--tags tag1 tag2] [--due YYYY-MM-DD] [--recurrence 3d|2w|1m|daily|weekly|monthly]")
+        print("  python todo.py list [--tag work] [--sort name|due]")
+        print("  python todo.py search \"search_term\"")
+        print("  python todo.py remove <index>")
+        print("  python todo.py edit <index> --new-description \"New description\"")
+        print("  python todo.py clear")
         return
 
     command = sys.argv[1]
@@ -216,8 +299,7 @@ def main():
             d_index = args.index("--due")
             if d_index + 1 < len(args):
                 due_date = args[d_index + 1]
-                args.pop(d_index)
-                args.pop(d_index)
+                args = args[:d_index] + args[d_index + 2:]
 
         if "--recurrence" in args:
             r_index = args.index("--recurrence")
@@ -237,152 +319,6 @@ def main():
                 filter_tag = sys.argv[tag_index + 1]
         list_todos(filter_tag)
 
-    elif command == "remove" and len(sys.argv) == 3:
-        try:
-            index = int(sys.argv[2])
-        except ValueError:
-            print("Invalid index. Please provide a number.")
-            return
-        todos = load_todos()
-        if not todos:
-            print("No tasks to remove.")
-            return
-        if 0 <= index < len(todos):
-            remove_todo(index)
-        else:
-            print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
-    elif command == "clear":
-        clear_todos()
-    else:
-        print(f"Error: Unknown command '{command}'.")
-        print("Valid commands are: add, list, remove, clear.")
-
-# Edit a task by index
-def edit_todo(index, new_description):
-    todos = load_todos()
-    if 0 <= index < len(todos):
-        old_task = todos[index]
-        todos[index] = new_description
-        save_todos(todos)
-        print(f" Updated task {index}:")
-        print(f"   Old: {old_task}")
-        print(f"   New: {new_description}")
-    else:
-        print("Invalid task index.")
-
-def add_todo(task, priority="Medium", tags=None):
-    valid_priorities = ["Low", "Medium", "High"]
-    if priority not in valid_priorities:
-        print("Invalid priority. Use: Low, Medium, or High.")
-        return
-
-    if tags is None:
-        tags = []
-
-    todos = load_todos()
-    todos.append({"task": task, "priority": priority, "tags": tags})
-    save_todos(todos)
-    print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
-
-
-    # If due date is provided, ensure it is a string in the format YYYY-MM-DD
-    if due_date:
-        try:
-            due_date = datetime.strptime(due_date, "%Y-%m-%d").date()  # Convert string to date
-        except ValueError:
-            print("Invalid date format. Please use YYYY-MM-DD.")
-            return
-    
-    # Add task with optional recurrence and due date
-    task_obj = {
-        "task": task,
-        "priority": priority,
-        "tags": tags,
-        "due_date": due_date,
-        "recurrence": recurrence,  # New field for recurrence
-        "next_due": due_date if due_date else None  # Initialize next_due with due_date
-    }
-    
-    todos.append(task_obj)
-    save_todos(todos)
-    print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}] [Due: {due_date if due_date else 'No due date'}] [Recurrence: {recurrence if recurrence else 'None'}]")
-
-# Command-line interface
-def main():
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print("  python todo.py add \"Task name\" [--priority High|Medium|Low]")
-        print("  python todo.py list [--tag work]")
-        print("  python todo.py remove <index>")
-        print("  python todo.py search \"search_term\"")
-        return
-
-    command = sys.argv[1]
-
-    if command == "add":
-        args = sys.argv[2:]
-        task = None
-        priority = "Medium"
-        tags = []
-
-        if "--priority" in args:
-            p_index = args.index("--priority")
-            if p_index + 1 < len(args):
-                priority = args[p_index + 1]
-                task = " ".join(args[:p_index])
-                args.pop(p_index)
-                args.pop(p_index)
-            else:
-                print("Error: Missing priority value after --priority.")
-                return
-
-        if "--tags" in args:
-            t_index = args.index("--tags")
-            tags = []
-            i = t_index + 1
-            while i < len(args) and not args[i].startswith("--"):
-                tags.append(args[i])
-                i += 1
-            args = args[:t_index] + args[i:]
-
-        task = " ".join(args)
-        add_todo(task, priority, tags)
-
-    elif command == "list":
-        filter_tag = None
-        sort_by = None
-
-        if "--tag" in sys.argv:
-            tag_index = sys.argv.index("--tag")
-            if tag_index + 1 < len(sys.argv):
-                filter_tag = sys.argv[tag_index + 1]
-
-        if "--sort" in sys.argv:
-            sort_index = sys.argv.index("--sort")
-            if sort_index + 1 < len(sys.argv):
-                sort_by = sys.argv[sort_index + 1]
-
-        list_todos(filter_tag, sort_by)
-
-    elif command == "remove":
-        if len(sys.argv) != 3:
-            print("Error: Please provide the index of the task to remove.")
-            print("Usage: python todo.py remove <index>")
-            return
-        try:
-            index = int(sys.argv[2])
-        except ValueError:
-            print("Error: Invalid index. Please provide a number.")
-            return
-        todos = load_todos()
-        if not todos:
-            print("No tasks to remove.")
-            return
-        if 0 <= index < len(todos):
-            remove_todo(index)
-        else:
-            print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
-
     elif command == "search":
         if len(sys.argv) < 3:
             print("Error: Please provide a search term.")
@@ -391,34 +327,28 @@ def main():
         search_term = " ".join(sys.argv[2:])
         search_todos(search_term)
 
-    else:
-        print(f"Error: Unknown command '{command}'.")
-        print("Valid commands are: add, list, remove, search.")
-
-    elif command == "list":
-        list_todos()
     elif command == "remove":
         if len(sys.argv) != 3:
             print("Error: Please provide the index of the task to remove.")
             print("Usage: python todo.py remove <index>")
             return
+        
         try:
             index = int(sys.argv[2])
         except ValueError:
             print("Invalid index. Please provide a number.")
-
-    elif command == "clear":
-        clear_todos()
-            print("Error: Invalid index. Please provide a number.")
             return
+        
         todos = load_todos()
         if not todos:
             print("No tasks to remove.")
             return
+        
         if 0 <= index < len(todos):
             remove_todo(index)
         else:
             print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
+
     elif command == "edit":
         if len(sys.argv) < 5 or "--new-description" not in sys.argv:
             print("Error: Please provide the index and new description.")
@@ -430,8 +360,7 @@ def main():
         except ValueError:
             print("Error: Invalid index. Please provide a number.")
             return
-            
-        # Find the --new-description flag and get the description after it
+        
         try:
             flag_index = sys.argv.index("--new-description")
             if flag_index + 1 >= len(sys.argv):
@@ -443,21 +372,29 @@ def main():
                 return
         except ValueError:
             print("Error: --new-description flag not found.")
-            print("Usage: python todo.py edit <index> --new-description \"New task description\"")
             return
-            
+        
         todos = load_todos()
         if not todos:
             print("No tasks to edit.")
             return
+        
         if 0 <= index < len(todos):
             edit_todo(index, new_description)
         else:
             print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
+
+
+    elif command == "clear":
+        clear_todos()
+        
     else:
         print(f"Error: Unknown command '{command}'.")
-        print("Valid commands are: add, list, remove.")
-        print("Valid commands are: add, list, remove, edit.")
+        print("Valid commands are: add, list, remove, clear.")
+
+
+
         
+
 if __name__ == "__main__":
     main()
