@@ -12,6 +12,7 @@ from collections import Counter
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
+from auth import validate
 
 console = Console()
 
@@ -378,4 +379,5 @@ def main(argv: List[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if validate():
+        main()
