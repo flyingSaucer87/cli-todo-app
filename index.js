@@ -1,4 +1,4 @@
-const { addTodo, listTodos, removeTodo } = require('./todo');
+const { addTodo, listTodos, removeTodo, clearTodos } = require("./todo");
 const args = process.argv.slice(2);
 
 const command = args[0];
@@ -9,6 +9,7 @@ if (command === 'help' || args.length === 0) {
       node index.js add "Task description"    - Adds a new task
       node index.js list                       - Lists all tasks
       node index.js remove <task_index>        - Removes a task by index
+      node index.js clear                      - Removes all tasks
   `);
   return;
 }
@@ -26,6 +27,10 @@ switch (command) {
     const taskIndex = parseInt(args[1], 10);
     removeTodo(taskIndex);
     console.log(`Removed task at index: ${taskIndex}`);
+    break;
+  case 'clear':
+    clearTodos();
+    console.log('All tasks have been removed.');
     break;
   default:
     console.log('Unknown command. Use "add", "list", or "remove".');

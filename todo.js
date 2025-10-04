@@ -21,6 +21,12 @@ function addTodo(task) {
   saveTodos();
 }
 
+// Remove all tasks
+function clearTodos() {
+  todos = [];
+  saveTodos();
+}
+
 // List all tasks
 function listTodos() {
   if (todos.length === 0) {
@@ -45,4 +51,4 @@ function removeTodo(index) {
 // Initialize tasks on startup
 loadTodos();
 
-module.exports = { addTodo, listTodos, removeTodo };
+module.exports = { addTodo, listTodos, removeTodo , clearTodos };
