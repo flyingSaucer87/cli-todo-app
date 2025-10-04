@@ -1,6 +1,6 @@
 # CLI Todo App
 
-This is a simple command-line Todo app built with Node.js. We're still in the early stages, so we'd love your help in getting it up and running!
+This is a simple command-line Todo app built with Node.js and python. We're still in the early stages, so we'd love your help in getting it up and running!
 
 ## How to Get Started
 
