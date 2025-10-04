@@ -7,6 +7,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import List
+from auth import validate
 
 # Default tasks file (next to this script). Can be overridden with TODO_FILE env var.
 TASKS_FILE = Path(os.getenv("TODO_FILE", Path(__file__).with_name("tasks.json")))
@@ -124,4 +125,5 @@ def main(argv: List[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if validate():
+        main()
