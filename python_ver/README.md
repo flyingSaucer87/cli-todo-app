@@ -28,6 +28,12 @@ git clone https://github.com/flyingSaucer87/cli-todo-app.git
 cd cli-todo-app/python_ver
 ```
 
+Alternatively, you can run the script from the repository root by referencing the path:
+```powershell
+# From repo root (Windows PowerShell)
+python python_ver\todo.py list
+```
+
 ## Usage
 
 ### Add a Task
@@ -82,6 +88,11 @@ Tasks are saved automatically in a file named `tasks.json` located in the same d
 You can change the file location by setting the `TODO_FILE` environment variable:
 ```bash
 export TODO_FILE=/path/to/custom_tasks.json
+```
+
+On Windows (PowerShell):
+```powershell
+$env:TODO_FILE = "C:\\path\\to\\custom_tasks.json"
 ```
 
 ## Error Handling
