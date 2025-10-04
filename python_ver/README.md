@@ -2,18 +2,17 @@
 
 Simple command-line todo application written in Python with task prioritization.
 Tasks are stored locally in a tasks.json file next to the script.
+Features
 
-## Features
+    Add new tasks
 
-- ✅ Add new tasks with priority levels (High, Medium, Low)
-- ✅ List all tasks sorted by priority
-- ✅ Remove tasks by index
-- ✅ Clear all tasks at once
-- ✅ Empty task validation (prevents adding blank or whitespace-only tasks)
-- ✅ Robust error handling for malformed JSON and I/O errors
-- ✅ Automatic backup of corrupted task files
-- ✅ Backward compatibility with old task format
-- ✅ Stores tasks persistently in a local JSON file
+    List all tasks
+
+    Remove tasks by index
+
+    Mark tasks as completed and view them separately
+
+    Stores tasks persistently in a local JSON file
 
 ## Requirements
 
