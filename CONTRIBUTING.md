@@ -4,14 +4,12 @@ First off, thank you for considering contributing to CLI Todo App! It's people l
 
 ## 📋 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
-- [Hacktoberfest Guidelines](#hacktoberfest-guidelines)
-- [How Can I Contribute?](#how-can-i-contribute)
-- [Development Setup](#development-setup)
-- [Coding Standards](#coding-standards)
-- [Pull Request Process](#pull-request-process)
-- [What We're Looking For](#what-were-looking-for)
-- [What NOT to Contribute](#what-not-to-contribute)
+- Code of Conduct
+- Hacktoberfest Guidelines
+- How Can I Contribute?
+- Coding Standards
+- What NOT to Contribute
+- Resources for New Contributors
 
 ---
 
