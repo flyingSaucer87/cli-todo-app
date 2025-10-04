@@ -8,30 +8,100 @@ import tempfile
 from pathlib import Path
 from typing import List, Dict, Any
 from typing import List, Dict, Any
+from collections import Counter
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress
+
+console = Console()
+
+def show_stats():
+    tasks = taskload()
+    if not tasks:
+        print("No tasks to analyze.")
+        return
+
+    # Completion Rate
+    completed = sum(1 for task in tasks if task.get("completed", False))
+    total = len(tasks)
+    completion_percent = (completed / total) * 100 if total else 0
+
+    # Priority Breakdown
+    priority_counts = Counter(task.get("priority", "Medium") for task in tasks)
+
+    # Tags Breakdown
+    tag_counts = Counter(tag for task in tasks for tag in task.get("tags", []))
+
+    # Display
+    console.rule("[bold green]📊 Task Analytics Dashboard")
+    console.print(f"\n✅ [bold]Completion:[/bold] {completed}/{total} tasks completed ({completion_percent:.2f}%)")
+
+    # Priority Table
+    table = Table(title="Priority Breakdown")
+    table.add_column("Priority", justify="left", style="cyan")
+    table.add_column("Count", justify="right", style="magenta")
+    for priority, count in priority_counts.items():
+        table.add_row(priority, str(count))
+    console.print(table)
+
+    # Tag Table
+    if tag_counts:
+        tag_table = Table(title="Most Used Tags")
+        tag_table.add_column("Tag", style="green")
+        tag_table.add_column("Count", justify="right", style="yellow")
+        for tag, count in tag_counts.most_common(10):
+            tag_table.add_row(tag, str(count))
+        console.print(tag_table)
+    else:
+        console.print("🔖 No tags found.")
+
+    console.rule()
+
+
+def cmd_add(description: str, priority: str = "Medium", tags: List[str] = [], completed: bool = False) -> None:
+
+    # Validate task is not empty
+    if not validate_task(description):
+        print("Error: Task description cannot be empty or whitespace only.", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate priority
+    if priority not in VALID_PRIORITIES:
+        print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join(VALID_PRIORITIES)}", file=sys.stderr)
+        sys.exit(1)
+
+    # Create a new task with additional attributes
+    tasks = taskload()
+    tasks.append({
+        "description": description,
+        "priority": priority,
+        "tags": tags,
+        "completed": completed,
+    })
+    tasksave(tasks)
+    print(f"Added task #{len(tasks)}: {description.strip()} [Priority: {priority}] [Tags: {', '.join(tags)}] [Completed: {completed}]")
+
+
 
 # Default tasks file (next to this script). Can be overridden with TODO_FILE env var.
 TASKS_FILE = Path(os.getenv("TODO_FILE", Path(__file__).with_name("tasks.json")))
 
 
 def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
-    """Normalize raw JSON data into a list of task dicts.
-
-    Accepted input formats:
-    - legacy: ["task one", "task two", ...]
-    - new: [{"description": str, "completed": bool}, ...]
-    Any unknown item types are skipped.
-    """
+    """Normalize raw JSON data into a list of task dicts."""
     normalized: List[Dict[str, Any]] = []
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, str):
-                normalized.append({"description": item, "completed": False})
-            elif isinstance(item, dict):
+            if isinstance(item, str):  # Legacy task format: simple string
+                normalized.append({"description": item, "completed": False, "priority": "Medium", "tags": []})
+            elif isinstance(item, dict):  # New task format
                 desc = item.get("description")
                 if isinstance(desc, str):
                     normalized.append({
                         "description": desc,
                         "completed": bool(item.get("completed", False)),
+                        "priority": item.get("priority", "Medium"),
+                        "tags": item.get("tags", []),
                     })
             # ignore other types silently
     return normalized
@@ -75,7 +145,9 @@ def backupcorrupt(reason: str) -> None:
 
 
 def tasksave(tasks: List[Dict[str, Any]]) -> None:
-
+    """
+    Save tasks to the JSON file.
+    """
     TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(tasks, ensure_ascii=False, indent=2)
 
@@ -107,6 +179,48 @@ def tasksave(tasks: List[Dict[str, Any]]) -> None:
                 os.remove(tmp_path)
             except Exception:
                 pass
+
+def build_parser() -> argparse.ArgumentParser:
+    """
+    Build and configure the argument parser for CLI commands.
+    """
+    parser = argparse.ArgumentParser(prog="todo.py", description="Simple CLI todo app in python")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_add = sub.add_parser("add", help="Add a task to the list")
+    p_add.add_argument("description", help="Task description")
+    p_add.add_argument(
+        "--priority",
+        "-p",
+        choices=["Low", "Medium", "High"],
+        default="Medium",
+        help="Task priority (default: Medium)"
+    )
+    p_add.add_argument(
+        "--tags",
+        "-t",
+        nargs="*",
+        default=[],
+        help="Tags associated with the task"
+    )
+    p_add.add_argument(
+        "--completed",
+        "-c",
+        action="store_true",
+        help="Mark task as completed"
+    )
+
+    p_list = sub.add_parser("list", help="List all tasks sorted by priority")
+
+    p_remove = sub.add_parser("remove", help="Remove a task by its index (1-based)")
+    p_remove.add_argument("index", type=int, help="Enter task index to remove")
+
+    p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
+    p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
+
+    p_stats = sub.add_parser("stats", help="Display task analytics (completion rate, priority, tags)")
+
+    return parser
 
 
 def validate_task(description: str) -> bool:
@@ -259,6 +373,8 @@ def main(argv: List[str] | None = None) -> None:
         cmd_remove(args.index)
     elif args.cmd == "complete":
         cmd_complete(args.index)
+    elif command == "stats":
+        show_stats()
 
 
 if __name__ == "__main__":
