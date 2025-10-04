@@ -170,7 +170,6 @@ def main():
             index = int(sys.argv[2])
         except ValueError:
             print("Invalid index. Please provide a number.")
-
     elif command == "clear":
         clear_todos()
             print("Error: Invalid index. Please provide a number.")
