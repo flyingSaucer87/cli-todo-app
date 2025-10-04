@@ -161,3 +161,6 @@ def main():
         print(f"Error: Unknown command '{command}'.")
         print("Valid commands are: add, list, remove, edit.")
 
+
+if __name__ == "__main__":
+    main()
