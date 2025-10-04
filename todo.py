@@ -16,21 +16,30 @@ def save_todos(todos):
     with open(FILE_PATH, "w") as f:
         json.dump(todos, f, indent=2)
 
-# Add a new task
-def add_todo(task):
-    todos = load_todos()
-    todos.append(task)
-    save_todos(todos)
-    print(f"✅ Added: {task}")
+# Add a new task with optional priority
+def add_todo(task, priority="Medium"):
+    valid_priorities = ["Low", "Medium", "High"]
+    if priority not in valid_priorities:
+        print("Invalid priority. Use: Low, Medium, or High.")
+        return
 
-# List all tasks
+    todos = load_todos()
+    todos.append({"task": task, "priority": priority})
+    save_todos(todos)
+    print(f"✅ Added: {task} [Priority: {priority}]")
+
+# List all tasks sorted by priority
 def list_todos():
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
         return
+
+    priority_order = {"High": 0, "Medium": 1, "Low": 2}
+    todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
+
     for i, task in enumerate(todos):
-        print(f"{i}: {task}")
+        print(f"{i}: {task['task']} [Priority: {task['priority']}]")
 
 # Remove a task by index
 def remove_todo(index):
@@ -38,7 +47,7 @@ def remove_todo(index):
     if 0 <= index < len(todos):
         removed = todos.pop(index)
         save_todos(todos)
-        print(f"🗑️ Removed: {removed}")
+        print(f"🗑️ Removed: {removed['task']} [Priority: {removed['priority']}]")
     else:
         print("Invalid task index.")
 
@@ -51,7 +60,7 @@ def clear_todos():
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python todo.py add \"Task name\"")
+        print("  python todo.py add \"Task name\" [--priority High|Medium|Low]")
         print("  python todo.py list")
         print("  python todo.py remove <index>")
         print("  python todo.py clear")
@@ -59,21 +68,40 @@ def main():
 
     command = sys.argv[1]
 
-    if command == "add" and len(sys.argv) >= 3:
-        task = " ".join(sys.argv[2:])
-        add_todo(task)
+    if command == "add":
+        args = sys.argv[2:]
+        task = None
+        priority = "Medium"
+
+        if "--priority" in args:
+            p_index = args.index("--priority")
+            if p_index + 1 < len(args):
+                priority = args[p_index + 1]
+                task = " ".join(args[:p_index])
+            else:
+                print("Error: Missing priority value after --priority.")
+                return
+        else:
+            task = " ".join(args)
+
+        add_todo(task, priority)
+
     elif command == "list":
         list_todos()
+
     elif command == "remove" and len(sys.argv) == 3:
         try:
             index = int(sys.argv[2])
             remove_todo(index)
         except ValueError:
             print("Invalid index. Please provide a number.")
+
     elif command == "clear":
         clear_todos()
+
     else:
         print("Unknown command.")
 
 if __name__ == "__main__":
     main()
+
