@@ -1,179 +1,146 @@
-# CLI Todo App
+# 📝 CLI Todo App
 
-Cross-platform, minimal command-line Todo app with two implementations:
+[![Hacktoberfest](https://img.shields.io/badge/Hacktoberfest-2025-blueviolet)](https://hacktoberfest.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Node.js](https://img.shields.io/badge/Node.js-14+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3.7+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-- Node.js (simple and quick)
-- Python (feature-rich with prioritization and robust I/O handling)
+A lightweight, cross-platform command-line task management tool with dual implementations designed for flexibility and ease of use. Perfect for developers who love staying organized from the terminal!
 
-Use whichever fits your workflow, or contribute to both.
-
----
-
-## Table of Contents
-
-- Overview
-- Features
-   - Node.js implementation
-   - Python implementation
-- Requirements
-- Installation
-- Usage
-   - Node.js
-   - Python
-- Task Storage
-- Project Structure
-- Contributing
-- License
+Choose between our **Node.js** implementation for speed and simplicity, or our **Python** implementation for advanced features like task prioritization and robust error handling.
 
 ---
 
-## Overview
+## ✨ Features
 
-This repository contains two independent CLI implementations that manage todos from the terminal. Both store tasks in a local JSON file and provide basic CRUD operations. The Python version also includes task prioritization and robust handling of corrupted/invalid data files.
+### Node.js Implementation
+- ✅ **Core Operations** – Add, list, edit, remove, and clear tasks
+- 💾 **Lightweight Storage** – Plain JSON file with no external dependencies
+- ⚡ **Zero Configuration** – Works out of the box with Node.js installed
+- 🚀 **Fast & Simple** – Perfect for quick task management
 
-We keep the Python source under `python_ver/` and the Node.js source at the repository root.
-
+### Python Implementation
+- 🎯 **Priority Management** – Organize tasks by High, Medium, or Low priority
+- 🛡️ **Smart Validation** – Prevents empty or whitespace-only task entries
+- 🔧 **Robust Error Handling** – Automatic backup and recovery from corrupted data files
+- 🔄 **Backward Compatibility** – Seamlessly handles older task formats
+- 📊 **Enhanced Sorting** – Automatic priority-based task ordering
+- 🐍 **Pure Python** – Standard library only, no external dependencies
+  
 ---
 
-## Features
-
-### Node.js implementation
-
-- Add, list, remove, edit, clear tasks
-- Stores tasks in a plain JSON file (`todos.json`)
-- Zero dependencies; runs with Node.js only
-
-### Python implementation
-
-- Add, list, remove, clear tasks
-- Task prioritization (High, Medium, Low) with sorted listing
-- Empty task validation (prevents blank/whitespace-only tasks)
-- Robust error handling for malformed JSON and I/O errors
-- Automatic backup of corrupted task files
-- Backward compatibility with older task formats
-- Stores tasks in a local JSON file (`tasks.json` next to the script)
-
----
-
-## Requirements
-
-- Node.js 14+ (for the Node.js CLI)
-- Python 3.7+ (for the Python CLI)
-   - No external Python dependencies (standard library only)
-
----
-
-## Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/flyingSaucer87/cli-todo-app.git
-cd cli-todo-app
+## 🛠️ Project Structure
+```
+cli-todo-app/
+├── index.js # Node.js CLI entry point
+├── todo.js # Node.js core implementation
+├── package.json # Node.js configuration and metadata
+├── todos.json # Node.js task storage
+├── python_ver/
+│ ├── todo.py # Python CLI entry point and implementation
+│ ├── tasks.json # Python task storage
+│ └── README.md # Python-specific documentation
+├── README.md # Main project documentation (this file)
+├── CONTRIBUTING.md # Contribution guidelines
+└── LICENSE # MIT License
 ```
 
 ---
 
-## Usage
+## 🚀 Quick Start
 
-### Node.js
+### Installation
 
-From the repository root:
+Clone the repository and start managing your tasks:
+```
+git clone https://github.com/flyingSaucer87/cli-todo-app.git
+cd cli-todo-app
+```
 
-```bash
-# Add a task
-node index.js add "Write tests"
+You're ready to go! Choose your preferred implementation below.
 
-# List tasks
+---
+
+### Node.js Version
+
+#### Prerequisites
+- Node.js 14 or higher
+
+#### Usage
+```
+# Add a new task
+node index.js add "Write comprehensive tests"
+
+# View all tasks
 node index.js list
+
+# Update an existing task
+node index.js edit 0 "Write unit and integration tests"
 
 # Remove a task by index
 node index.js remove 0
-
-# Edit a task by index
-node index.js edit 0 "Write unit tests for todo"
 
 # Clear all tasks
 node index.js clear
 ```
 
-### Python
+---
 
-From the repository root (Windows PowerShell example shown), use the script under `python_ver/`:
+### Python Version
 
-```powershell
-# Add a task (default priority: Medium)
-python python_ver\todo.py add "Review PR"
+#### Prerequisites
+- Python 3.7 or higher
 
-# Add with explicit priority
-python python_ver\todo.py add "Fix critical bug" --priority High
+#### Usage
+```
+# Add a task with default priority (Medium)
+python python_ver/todo.py add "Review pull requests"
 
-# List tasks sorted by priority (High → Medium → Low)
-python python_ver\todo.py list
+# Add a task with specific priority
+python python_ver/todo.py add "Fix critical security bug" --priority High
 
-# Remove by 1-based index
-python python_ver\todo.py remove 2
+# View all tasks (sorted by priority: High → Medium → Low)
+python python_ver/todo.py list
+
+# Remove a task by index (1-based)
+python python_ver/todo.py remove 2
 
 # Clear all tasks
-python python_ver\todo.py clear
+python python_ver/todo.py clear
+
 ```
 
-If you prefer using bash/zsh from the `python_ver` directory:
-
-```bash
+**If you prefer using bash/zsh from the `python_ver` directory:**
+```
 cd python_ver
-python todo.py add "Write docs" -p Low
+python todo.py add "Update documentation" -p Low
 python todo.py list
 ```
 
 ---
 
-## Task Storage
+## 💾 Task Storage
 
-- Node.js: stores tasks in `todos.json` at the repository root.
-- Python: stores tasks in `tasks.json` next to `python_ver/todo.py` by default.
+### Default Storage Locations
 
-Python also supports overriding the task file path with an environment variable:
+- **Node.js**: Tasks are saved in `todos.json` at the repository root
+- **Python**: Tasks are saved in `tasks.json` within the `python_ver/` directory
 
-```bash
+### Custom Storage Path (Python)
+
+Override the default storage location using an environment variable:
+```
 # macOS/Linux
 export TODO_FILE=/path/to/custom_tasks.json
 ```
-
-```powershell
+```
 # Windows PowerShell
-$env:TODO_FILE = "C:\\path\\to\\custom_tasks.json"
+$env:TODO_FILE = "C:\path\to\custom_tasks.json"
 ```
 
 ---
 
-## Project Structure
+## 📜 License
 
-```text
-cli-todo-app/
-├─ index.js                # Node.js CLI entry
-├─ todo.js                 # Node.js implementation
-├─ package.json            # Node.js metadata/scripts
-├─ python_ver/
-│  ├─ todo.py              # Python CLI entry and implementation
-│  └─ README.md            # Python-specific docs
-├─ README.md               # Project-level documentation (this file)
-├─ LICENSE
-└─ CONTRIBUTING.md
-```
-
-Note: We maintain a single Python implementation under `python_ver/`.
-
----
-
-## Contributing
-
-Contributions are welcome! Please read `CONTRIBUTING.md` for guidelines on setting up your environment, code style, and how to propose changes.
-
-Suggestions, issues, and PRs are encouraged—especially around test coverage and feature parity between the Node and Python versions.
-
----
-
-## License
-
-This project is licensed under the MIT License. See `LICENSE` for details.
+This project is open source and available under the [MIT License](LICENSE). Feel free to use, modify, and distribute as needed.
