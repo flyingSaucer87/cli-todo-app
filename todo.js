@@ -42,7 +42,13 @@ function removeTodo(index) {
   }
 }
 
+// Clear all tasks
+function clearTodos() {
+  todos = [];
+  saveTodos();
+}
+
 // Initialize tasks on startup
 loadTodos();
 
-module.exports = { addTodo, listTodos, removeTodo };
+module.exports = { addTodo, listTodos, removeTodo, clearTodos };
