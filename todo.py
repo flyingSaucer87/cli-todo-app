@@ -55,6 +55,8 @@ def add_todo(task, due_date=None):
     save_todos(todos)
     print(f"✅ Added: {task}, Due: {due_date if due_date else 'No due date'}")
 
+def list_todos(filter_tag=None, sort_by=None):
+
 # List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None):
   
@@ -67,15 +69,21 @@ def list_todos(filter_tag=None):
     if filter_tag:
         todos = [t for t in todos if filter_tag in t.get("tags", [])]
 
-    priority_order = {"High": 0, "Medium": 1, "Low": 2}
-    todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
+    if sort_by == "name":
+        todos.sort(key=lambda x: x.get("task", "").lower())
+    elif sort_by == "due":
+        todos.sort(key=lambda x: x.get("due", ""))  
+    else:
+        priority_order = {"High": 0, "Medium": 1, "Low": 2}
+        todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
+        due = task.get("due", "N/A")
+        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}]")
         due_date_str = task["due_date"].strftime("%Y-%m-%d") if task["due_date"] else "No due date"
         next_due_str = task["next_due"] if task["next_due"] else "No recurrence"
         print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due_date_str}] [Next Due: {next_due_str}] [Recurrence: {task['recurrence'] if task['recurrence'] else 'None'}]")
-
 
 # Search tasks by text or tag
 def search_todos(search_term):
@@ -100,9 +108,6 @@ def search_todos(search_term):
     for i, task in enumerate(matching_tasks):
         tags = ", ".join(task.get("tags", []))
         print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] [Tags: {tags}]")
-
-
-
 
 # Remove a task by index
 def remove_todo(index):
@@ -152,13 +157,10 @@ def check_due_tasks(todos):
     else:
         print("\n✅ No tasks are due today.")
 
-
 # Clear all tasks
 def clear_todos():
     save_todos([])
     print("All tasks have been cleared.")
-
-
 
 # Function to calculate the next due date for recurring tasks
 def calculate_next_due(due_date, recurrence):
@@ -174,7 +176,6 @@ def calculate_next_due(due_date, recurrence):
         return next_month.strftime("%Y-%m-%d")
     else:
         return due_date
-
 
 # Command-line interface
 def main():
@@ -306,8 +307,6 @@ def add_todo(task, priority="Medium", tags=None):
     save_todos(todos)
     print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}] [Due: {due_date if due_date else 'No due date'}] [Recurrence: {recurrence if recurrence else 'None'}]")
 
-    
-# Command-line interface
 # Command-line interface
 def main():
     if len(sys.argv) < 2:
@@ -351,11 +350,19 @@ def main():
 
     elif command == "list":
         filter_tag = None
+        sort_by = None
+
         if "--tag" in sys.argv:
             tag_index = sys.argv.index("--tag")
             if tag_index + 1 < len(sys.argv):
                 filter_tag = sys.argv[tag_index + 1]
-        list_todos(filter_tag)
+
+        if "--sort" in sys.argv:
+            sort_index = sys.argv.index("--sort")
+            if sort_index + 1 < len(sys.argv):
+                sort_by = sys.argv[sort_index + 1]
+
+        list_todos(filter_tag, sort_by)
 
     elif command == "remove":
         if len(sys.argv) != 3:
@@ -388,7 +395,6 @@ def main():
         print(f"Error: Unknown command '{command}'.")
         print("Valid commands are: add, list, remove, search.")
 
-    
     elif command == "list":
         list_todos()
     elif command == "remove":
