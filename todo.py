@@ -53,19 +53,36 @@ def main():
 
     command = sys.argv[1]
 
-    if command == "add" and len(sys.argv) >= 3:
+    if command == "add":
+        if len(sys.argv) < 3 or not " ".join(sys.argv[2:]).strip():
+            print("Error: Please provide a task description to add.")
+            print("Usage: python todo.py add \"Task name\"")
+            return
         task = " ".join(sys.argv[2:])
         add_todo(task)
     elif command == "list":
         list_todos()
-    elif command == "remove" and len(sys.argv) == 3:
+    elif command == "remove":
+        if len(sys.argv) != 3:
+            print("Error: Please provide the index of the task to remove.")
+            print("Usage: python todo.py remove <index>")
+            return
         try:
             index = int(sys.argv[2])
-            remove_todo(index)
         except ValueError:
-            print("Invalid index. Please provide a number.")
+            print("Error: Invalid index. Please provide a number.")
+            return
+        todos = load_todos()
+        if not todos:
+            print("No tasks to remove.")
+            return
+        if 0 <= index < len(todos):
+            remove_todo(index)
+        else:
+            print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
     else:
-        print("Unknown command.")
+        print(f"Error: Unknown command '{command}'.")
+        print("Valid commands are: add, list, remove.")
 
 if __name__ == "__main__":
     main()
