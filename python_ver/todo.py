@@ -7,65 +7,49 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Any
+from typing import List, Dict, Any
 
 # Default tasks file (next to this script). Can be overridden with TODO_FILE env var.
 TASKS_FILE = Path(os.getenv("TODO_FILE", Path(__file__).with_name("tasks.json")))
 
-# Priority levels
-PRIORITY_HIGH = "High"
-PRIORITY_MEDIUM = "Medium"
-PRIORITY_LOW = "Low"
-VALID_PRIORITIES = [PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH]
-DEFAULT_PRIORITY = PRIORITY_MEDIUM
 
-# Priority order for sorting (higher number = higher priority)
-PRIORITY_ORDER = {
-    PRIORITY_HIGH: 3,
-    PRIORITY_MEDIUM: 2,
-    PRIORITY_LOW: 1,
-}
+def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
+    """Normalize raw JSON data into a list of task dicts.
 
-
-def taskload() -> List[Dict[str, str]]:
+    Accepted input formats:
+    - legacy: ["task one", "task two", ...]
+    - new: [{"description": str, "completed": bool}, ...]
+    Any unknown item types are skipped.
     """
-    Load tasks from the JSON file.
+    normalized: List[Dict[str, Any]] = []
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, str):
+                normalized.append({"description": item, "completed": False})
+            elif isinstance(item, dict):
+                desc = item.get("description")
+                if isinstance(desc, str):
+                    normalized.append({
+                        "description": desc,
+                        "completed": bool(item.get("completed", False)),
+                    })
+            # ignore other types silently
+    return normalized
 
-    Returns:
-        List of task dictionaries with 'task' and 'priority' keys.
-        If file doesn't exist or is corrupted, returns empty list.
-    """
+
+def taskload() -> List[Dict[str, Any]]:
+
     if not TASKS_FILE.exists():
         return []
 
     try:
         with TASKS_FILE.open("r", encoding="utf-8") as f:
             data = json.load(f)
-
-        if isinstance(data, list):
-            # Migrate old format (list of strings) to new format (list of dicts)
-            tasks = []
-            for item in data:
-                if isinstance(item, dict) and "task" in item:
-                    # New format - ensure it has priority
-                    task_dict = {
-                        "task": str(item["task"]),
-                        "priority": item.get("priority", DEFAULT_PRIORITY)
-                    }
-                    tasks.append(task_dict)
-                elif isinstance(item, str):
-                    # Old format - migrate to new format with default priority
-                    tasks.append({
-                        "task": str(item),
-                        "priority": DEFAULT_PRIORITY
-                    })
-                else:
-                    # Skip invalid items
-                    continue
-            return tasks
-        else:
-            # unexpected format
-            backupcorrupt("not-a-list")
-            return []
+        tasks = _normalize_tasks(data)
+        # If file was legacy format, persist normalized structure
+        if isinstance(data, list) and tasks and not isinstance(data[0], dict):
+            tasksave(tasks)
+        return tasks
     except json.JSONDecodeError:
         backupcorrupt("json-decode-error")
         return []
@@ -90,25 +74,9 @@ def backupcorrupt(reason: str) -> None:
         print(f"Failed to back up corrupted tasks file: {e}", file=sys.stderr)
 
 
-def tasksave(tasks: List[Dict[str, str]]) -> None:
-    """
-    Save tasks to the JSON file atomically.
+def tasksave(tasks: List[Dict[str, Any]]) -> None:
 
-    Uses a temporary file and atomic rename to prevent data corruption.
-    Handles permission errors and disk space issues gracefully.
-
-    Args:
-        tasks: List of task dictionaries to save.
-
-    Raises:
-        SystemExit: If file cannot be saved due to I/O errors.
-    """
-    try:
-        TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    except (PermissionError, OSError) as e:
-        print(f"Error: Cannot create directory {TASKS_FILE.parent}: {e}", file=sys.stderr)
-        sys.exit(1)
-
+    TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(tasks, ensure_ascii=False, indent=2)
 
     try:
@@ -173,11 +141,7 @@ def cmd_add(description: str, priority: str = DEFAULT_PRIORITY) -> None:
         sys.exit(1)
 
     tasks = taskload()
-    new_task = {
-        "task": description.strip(),
-        "priority": priority
-    }
-    tasks.append(new_task)
+    tasks.append({"description": description, "completed": False})
     tasksave(tasks)
     print(f"Added task #{len(tasks)}: {description.strip()} [Priority: {priority}]")
 
@@ -191,13 +155,20 @@ def cmd_list() -> None:
         print("No tasks.")
         return
 
-    # Sort tasks by priority (High first, then Medium, then Low)
-    sorted_tasks = sorted(tasks, key=lambda t: PRIORITY_ORDER.get(t.get("priority", DEFAULT_PRIORITY), 0), reverse=True)
+    pending = [(i, t) for i, t in enumerate(tasks, start=1) if not t.get("completed", False)]
+    completed = [(i, t) for i, t in enumerate(tasks, start=1) if t.get("completed", False)]
 
-    for i, task_dict in enumerate(sorted_tasks, start=1):
-        task_text = task_dict.get("task", "")
-        priority = task_dict.get("priority", DEFAULT_PRIORITY)
-        print(f"{i}. [{priority}] {task_text}")
+    if pending:
+        print("Pending tasks:")
+        for i, t in pending:
+            print(f"  {i}. {t['description']}")
+    else:
+        print("No pending tasks.")
+
+    if completed:
+        print("\nCompleted tasks:")
+        for i, t in completed:
+            print(f"  {i}. {t['description']} (completed)")
 
 
 def cmd_remove(index: int) -> None:
@@ -218,20 +189,25 @@ def cmd_remove(index: int) -> None:
     removed_text = removed.get("task", str(removed))
     removed_priority = removed.get("priority", "")
     tasksave(tasks)
-    print(f"Removed task #{index}: {removed_text} [Priority: {removed_priority}]")
+    desc = removed["description"] if isinstance(removed, dict) else str(removed)
+    print(f"Removed task #{index}: {desc}")
 
 
-def cmd_clear() -> None:
-    """
-    Clear all tasks from the list.
-    """
+def cmd_complete(index: int) -> None:
     tasks = taskload()
     if not tasks:
-        print("No tasks to clear.")
+        print("No tasks to complete.")
+        sys.exit(0)
+    if index < 1 or index > len(tasks):
+        print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.")
+        sys.exit(2)
+    task = tasks[index - 1]
+    if task.get("completed", False):
+        print(f"Task #{index} is already completed: {task['description']}")
         return
-
-    tasksave([])
-    print(f"Cleared all {len(tasks)} task(s).")
+    task["completed"] = True
+    tasksave(tasks)
+    print(f"Marked task #{index} as completed: {task['description']}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -259,7 +235,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_remove = sub.add_parser("remove", help="Remove a task by its index (1-based)")
     p_remove.add_argument("index", type=int, help="Enter task index to remove")
 
-    p_clear = sub.add_parser("clear", help="Remove all tasks")
+    p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
+    p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
 
     return parser
 
@@ -280,8 +257,8 @@ def main(argv: List[str] | None = None) -> None:
         cmd_list()
     elif args.cmd == "remove":
         cmd_remove(args.index)
-    elif args.cmd == "clear":
-        cmd_clear()
+    elif args.cmd == "complete":
+        cmd_complete(args.index)
 
 
 if __name__ == "__main__":
