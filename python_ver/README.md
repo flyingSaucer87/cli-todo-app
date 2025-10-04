@@ -1,4 +1,6 @@
-Simple command-line todo application written in Python.
+# Python CLI Todo App
+
+Simple command-line todo application written in Python with task prioritization.
 Tasks are stored locally in a tasks.json file next to the script.
 Features
 
@@ -12,11 +14,10 @@ Features
 
     Stores tasks persistently in a local JSON file
 
-Requirements
+## Requirements
 
-    Python 3.7 or higher
-
-    No external dependencies (uses only the Python standard library)
+- Python 3.7 or higher
+- No external dependencies (uses only the Python standard library)
 
 Installation
     After cloning the repo, navigate to  
