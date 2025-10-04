@@ -19,6 +19,8 @@ def save_todos(todos):
 
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
+# Add a new task with optional priority
+def add_todo(task, priority="Medium"):
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -31,6 +33,10 @@ def add_todo(task, priority="Medium", tags=None):
     todos.append({"task": task, "priority": priority, "tags": tags})
     save_todos(todos)
     print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
+    todos = load_todos()
+    todos.append({"task": task, "priority": priority})
+    save_todos(todos)
+    print(f"✅ Added: {task} [Priority: {priority}]")
 
 # Add a new task
 def add_todo(task, due_date=None):
@@ -50,6 +56,10 @@ def add_todo(task, due_date=None):
 
 # List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None):
+  
+# List all tasks sorted by priority
+def list_todos():
+
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
@@ -73,6 +83,20 @@ def remove_todo(index):
         save_todos(todos)
         print(f"🗑️ Removed: {removed['task']} [Priority: {removed['priority']}]")
 
+    priority_order = {"High": 0, "Medium": 1, "Low": 2}
+    todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
+
+    for i, task in enumerate(todos):
+        print(f"{i}: {task['task']} [Priority: {task['priority']}]")
+
+# Remove a task by index
+def remove_todo(index):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        removed = todos.pop(index)
+        save_todos(todos)
+        print(f"🗑️ Removed: {removed['task']} [Priority: {removed['priority']}]")
+        
     # Check for tasks due today
     check_due_tasks(todos)
     
@@ -104,6 +128,20 @@ def main():
         print("  python todo.py add \"Task name\" [--priority High|Medium|Low]")
         print("  python todo.py list [--tag work]")
 
+# Edit a task by index
+def edit_todo(index, new_description):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        old_task = todos[index]
+        todos[index] = new_description
+        save_todos(todos)
+        print(f" Updated task {index}:")
+        print(f"   Old: {old_task}")
+        print(f"   New: {new_description}")
+    else:
+        print("Invalid task index.")
+
+# Command-line interface
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
@@ -111,6 +149,7 @@ def main():
         print("  python todo.py list")
         print("  python todo.py remove <index>")
         print("  python todo.py clear")
+        print("  python todo.py edit <index> --new-description \"Updated task\"")
         return
 
     command = sys.argv[1]
@@ -120,6 +159,7 @@ def main():
         task = None
         priority = "Medium"
         tags = []
+
 
         if "--priority" in args:
             p_index = args.index("--priority")
@@ -151,6 +191,18 @@ def main():
             if tag_index + 1 < len(sys.argv):
                 filter_tag = sys.argv[tag_index + 1]
         list_todos(filter_tag)
+        
+            else:
+                print("Error: Missing priority value after --priority.")
+                return
+        else:
+            task = " ".join(args)
+
+        add_todo(task, priority)
+
+    elif command == "list":
+        list_todos()
+
 
     elif command == "remove" and len(sys.argv) == 3:
         if len(sys.argv) < 3 or not " ".join(sys.argv[2:]).strip():
@@ -191,9 +243,45 @@ def main():
             remove_todo(index)
         else:
             print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
+    elif command == "edit":
+        if len(sys.argv) < 5 or "--new-description" not in sys.argv:
+            print("Error: Please provide the index and new description.")
+            print("Usage: python todo.py edit <index> --new-description \"New task description\"")
+            return
+        
+        try:
+            index = int(sys.argv[2])
+        except ValueError:
+            print("Error: Invalid index. Please provide a number.")
+            return
+            
+        # Find the --new-description flag and get the description after it
+        try:
+            flag_index = sys.argv.index("--new-description")
+            if flag_index + 1 >= len(sys.argv):
+                print("Error: Please provide a description after --new-description.")
+                return
+            new_description = " ".join(sys.argv[flag_index + 1:])
+            if not new_description.strip():
+                print("Error: New description cannot be empty.")
+                return
+        except ValueError:
+            print("Error: --new-description flag not found.")
+            print("Usage: python todo.py edit <index> --new-description \"New task description\"")
+            return
+            
+        todos = load_todos()
+        if not todos:
+            print("No tasks to edit.")
+            return
+        if 0 <= index < len(todos):
+            edit_todo(index, new_description)
+        else:
+            print(f"Error: Task index {index} does not exist. Use 'list' to see valid indices.")
     else:
         print(f"Error: Unknown command '{command}'.")
         print("Valid commands are: add, list, remove.")
+        print("Valid commands are: add, list, remove, edit.")
         
 if __name__ == "__main__":
     main()
