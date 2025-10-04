@@ -67,17 +67,39 @@ def clear_todos():
     save_todos([])
     print("All tasks have been cleared.")
 
+# Load plugins from plugins/ folder
+def load_plugins():
+    plugins = {}
+    plugin_dir = "plugins"
+    if os.path.isdir(plugin_dir):
+        for filename in os.listdir(plugin_dir):
+            if filename.endswith(".py"):
+                plugin_name = filename[:-3]
+                try:
+                    module = __import__(f"{plugin_dir}.{plugin_name}", fromlist=["run"])
+                    if hasattr(module, "run"):
+                        plugins[plugin_name] = module.run
+                except Exception as e:
+                    print(f"⚠️ Failed to load plugin {plugin_name}: {e}")
+    return plugins
+
 # Command-line interface
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python todo.py add \"Task name\" [--priority High|Medium|Low]")
-        print("  python todo.py list [--tag work]")
+        print("  python todo.py add \"Task name\" [--priority High|Medium|Low] [--tags work personal]")
+        print("  python todo.py list [--tag work] [--sort name|due]")
         print("  python todo.py remove <index>")
         print("  python todo.py clear")
+        print("  python todo.py <plugin_name> [args...]")
         return
 
     command = sys.argv[1]
+    plugins = load_plugins()
+
+    if command in plugins:
+        plugins[command](sys.argv[2:])
+        return
 
     if command == "add":
         args = sys.argv[2:]
@@ -95,7 +117,7 @@ def main():
             else:
                 print("Error: Missing priority value after --priority.")
                 return
-      
+
         if "--tags" in args:
             t_index = args.index("--tags")
             tags = []
@@ -139,3 +161,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
