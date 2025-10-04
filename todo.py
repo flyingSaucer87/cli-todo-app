@@ -3,10 +3,40 @@ import os
 import sys
 from datetime import datetime
 from datetime import datetime, timedelta
+from colorama import init, Fore, Back, Style
+
+init(autoreset=True)
+
 
 FILE_PATH = "todos.json"
 
 # Load tasks from JSON file
+
+def load_user_settings():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return {"mode": "light"}  # Default to light mode if no config file exists.
+
+def save_user_settings(mode):
+    settings = {"mode": mode}
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(settings, f, indent=4)
+        
+def apply_mode(mode):
+    if mode == "dark":
+        return {
+            "background": Back.BLACK,  # Black background for dark mode
+            "foreground": Fore.WHITE,  # White text for dark mode
+        }
+    else:
+        return {
+            "background": Back.WHITE,  # White background for light mode
+            "foreground": Fore.BLACK,  # Black text for light mode
+        }
+
+
+
 def load_todos():
     if os.path.exists(FILE_PATH):
         with open(FILE_PATH, "r") as f:
@@ -62,28 +92,23 @@ def list_todos(filter_tag=None):
   
 def list_todos(filter_tag=None):
     todos = load_todos()
+    settings = load_user_settings()  # Load current settings
+    mode = settings["mode"]  # Retrieve mode
+    colors = apply_mode(mode)  # Get the color scheme based on the mode
+
     if not todos:
-        print("No tasks yet!")
+        print(f"{colors['foreground']}No tasks yet!")
         return
 
     if filter_tag:
         todos = [t for t in todos if filter_tag in t.get("tags", [])]
 
-    if sort_by == "name":
-        todos.sort(key=lambda x: x.get("task", "").lower())
-    elif sort_by == "due":
-        todos.sort(key=lambda x: x.get("due", ""))  
-    else:
-        priority_order = {"High": 0, "Medium": 1, "Low": 2}
-        todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
+    priority_order = {"High": 0, "Medium": 1, "Low": 2}
+    todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
-        due = task.get("due", "N/A")
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}]")
-        due_date_str = task["due_date"].strftime("%Y-%m-%d") if task["due_date"] else "No due date"
-        next_due_str = task["next_due"] if task["next_due"] else "No recurrence"
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due_date_str}] [Next Due: {next_due_str}] [Recurrence: {task['recurrence'] if task['recurrence'] else 'None'}]")
+        print(f"{colors['foreground']}{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}]")
 
 # Search tasks by text or tag
 def search_todos(search_term):
@@ -318,6 +343,16 @@ def main():
         return
 
     command = sys.argv[1]
+    
+    if command == "--dark-mode":
+        save_user_settings("dark")
+        print("🌙 Dark mode enabled.")
+        return
+
+    if command == "--light-mode":
+        save_user_settings("light")
+        print("🌞 Light mode enabled.")
+        return
 
     if command == "add":
         args = sys.argv[2:]
