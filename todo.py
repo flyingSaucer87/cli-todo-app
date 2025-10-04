@@ -42,6 +42,11 @@ def remove_todo(index):
     else:
         print("Invalid task index.")
 
+# Clear all tasks
+def clear_todos():
+    save_todos([])
+    print("All tasks have been cleared.")
+
 # Command-line interface
 def main():
     if len(sys.argv) < 2:
@@ -49,6 +54,7 @@ def main():
         print("  python todo.py add \"Task name\"")
         print("  python todo.py list")
         print("  python todo.py remove <index>")
+        print("  python todo.py clear")
         return
 
     command = sys.argv[1]
@@ -64,6 +70,8 @@ def main():
             remove_todo(index)
         except ValueError:
             print("Invalid index. Please provide a number.")
+    elif command == "clear":
+        clear_todos()
     else:
         print("Unknown command.")
 
