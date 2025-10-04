@@ -66,8 +66,8 @@ def cmd_add(description: str, priority: str = "Medium", tags: List[str] = [], co
         sys.exit(1)
 
     # Validate priority
-    if priority not in VALID_PRIORITIES:
-        print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join(VALID_PRIORITIES)}", file=sys.stderr)
+    if priority not in "VALID_PRIORITIES":
+        print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join('VALID_PRIORITIES')}", file=sys.stderr)
         sys.exit(1)
 
     # Create a new task with additional attributes
@@ -86,6 +86,31 @@ def cmd_add(description: str, priority: str = "Medium", tags: List[str] = [], co
 # Default tasks file (next to this script). Can be overridden with TODO_FILE env var.
 TASKS_FILE = Path(os.getenv("TODO_FILE", Path(__file__).with_name("tasks.json")))
 
+# File for user settings
+CONFIG_FILE = Path(os.getenv("TODO_CONFIG_FILE", Path(__file__).with_name("config.json")))
+
+# --- Settings Management ---
+def load_config() -> Dict[str, Any]:
+    """Load user settings from the config file."""
+    if not CONFIG_FILE.exists():
+        return {"dark_mode": False}  # Default settings
+    try:
+        with CONFIG_FILE.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        # If config is corrupt or unreadable, return defaults
+        return {"dark_mode": False}
+
+
+def save_config(config: Dict[str, Any]) -> None:
+    """Save user settings to the config file."""
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with CONFIG_FILE.open("w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+    except IOError as e:
+        print(f"Error: Could not save settings to {CONFIG_FILE}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
     """Normalize raw JSON data into a list of task dicts."""
@@ -236,7 +261,7 @@ def validate_task(description: str) -> bool:
     return description and description.strip()
 
 
-def cmd_add(description: str, priority: str = DEFAULT_PRIORITY) -> None:
+def cmd_add(description: str, priority: str = "DEFAULT_PRIORITY") -> None:
     """
     Add a new task with the given description and priority.
 
@@ -250,8 +275,8 @@ def cmd_add(description: str, priority: str = DEFAULT_PRIORITY) -> None:
         sys.exit(1)
 
     # Validate priority
-    if priority not in VALID_PRIORITIES:
-        print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join(VALID_PRIORITIES)}", file=sys.stderr)
+    if priority not in "VALID_PRIORITIES":
+        print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join('VALID_PRIORITIES')}", file=sys.stderr)
         sys.exit(1)
 
     tasks = taskload()
@@ -262,12 +287,19 @@ def cmd_add(description: str, priority: str = DEFAULT_PRIORITY) -> None:
 
 def cmd_list() -> None:
     """
-    List all tasks, sorted by priority (High -> Medium -> Low).
+    List all tasks, using a dark-mode friendly format if enabled.
     """
+    config = load_config()
+    dark_mode = config.get("dark_mode", False)
     tasks = taskload()
+
     if not tasks:
         print("No tasks.")
         return
+
+    # Define display characters based on the mode
+    pending_char = "○" if dark_mode else "[ ]"
+    completed_char = "●" if dark_mode else "[x]"
 
     pending = [(i, t) for i, t in enumerate(tasks, start=1) if not t.get("completed", False)]
     completed = [(i, t) for i, t in enumerate(tasks, start=1) if t.get("completed", False)]
@@ -275,14 +307,14 @@ def cmd_list() -> None:
     if pending:
         print("Pending tasks:")
         for i, t in pending:
-            print(f"  {i}. {t['description']}")
+            print(f"  {pending_char} {i}. {t['description']}")
     else:
         print("No pending tasks.")
 
     if completed:
         print("\nCompleted tasks:")
         for i, t in completed:
-            print(f"  {i}. {t['description']} (completed)")
+            print(f"  {completed_char} {i}. {t['description']} (completed)")
 
 
 def cmd_remove(index: int) -> None:
@@ -323,6 +355,21 @@ def cmd_complete(index: int) -> None:
     tasksave(tasks)
     print(f"Marked task #{index} as completed: {task['description']}")
 
+def cmd_settings(dark_mode: str | None) -> None:
+    """Update user preferences."""
+    if dark_mode is None:
+        # Show current settings if no flag is provided
+        config = load_config()
+        status = "on" if config.get("dark_mode", False) else "off"
+        print(f"Current settings:\n- Dark Mode: {status}")
+        return
+
+    config = load_config()
+    new_status = dark_mode.lower() == 'on'
+    config['dark_mode'] = new_status
+    save_config(config)
+    status_text = "enabled" if new_status else "disabled"
+    print(f"Dark mode has been {status_text}.")
 
 def build_parser() -> argparse.ArgumentParser:
     """
@@ -339,9 +386,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument(
         "--priority",
         "-p",
-        choices=VALID_PRIORITIES,
-        default=DEFAULT_PRIORITY,
-        help=f"Task priority (default: {DEFAULT_PRIORITY})"
+        choices="VALID_PRIORITIES",
+        default="DEFAULT_PRIORITY",
+        help=f"Task priority (default: {'DEFAULT_PRIORITY'})"
     )
 
     p_list = sub.add_parser("list", help="List all tasks sorted by priority")
@@ -351,6 +398,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
     p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
+
+    p_settings = sub.add_parser("settings", help="Configure user preferences")
+    p_settings.add_argument(
+        "--dark-mode",
+        choices=['on', 'off'],
+        help="Enable or disable dark mode ('on' or 'off')"
+    )
 
     return parser
 
@@ -373,8 +427,10 @@ def main(argv: List[str] | None = None) -> None:
         cmd_remove(args.index)
     elif args.cmd == "complete":
         cmd_complete(args.index)
-    elif command == "stats":
+    elif args.cmd == "stats":
         show_stats()
+    elif args.cmd == "settings":
+        cmd_settings(args.dark_mode)
 
 
 if __name__ == "__main__":
