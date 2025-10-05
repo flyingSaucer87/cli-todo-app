@@ -459,7 +459,7 @@ from collections import Counter
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
-# import speech_recognition as sr
+import speech_recognition as sr
 from auth import validate
 
 console = Console()
@@ -777,90 +777,90 @@ def show_stats(user):
 
     console.rule()
 
-# def cmd_voice() -> None:
-#     """Voice command mode for hands-free interaction."""
-#     r = sr.Recognizer()
-#     try:
-#         m = sr.Microphone()
-#     except Exception as e:
-#         console.print(f"No microphone found: {e}", style="red")
-#         return
+def cmd_voice() -> None:
+    """Voice command mode for hands-free interaction."""
+    r = sr.Recognizer()
+    try:
+        m = sr.Microphone()
+    except Exception as e:
+        console.print(f"No microphone found: {e}", style="red")
+        return
 
-#     try:
-#         with m as source:
-#             r.adjust_for_ambient_noise(source, duration=1)
-#     except Exception as e:
-#         pass  # Continue anyway
+    try:
+        with m as source:
+            r.adjust_for_ambient_noise(source, duration=1)
+    except Exception as e:
+        pass  # Continue anyway
 
-#     console.print("Voice mode activated. Speak your commands clearly. Say 'exit' to quit.")
-#     console.print("Supported: 'add task <description>', 'list tasks', 'remove task <number>'")
-#     console.print("Tip: Press Ctrl+C to force quit if needed.", style="italic")
+    console.print("Voice mode activated. Speak your commands clearly. Say 'exit' to quit.")
+    console.print("Supported: 'add task <description>', 'list tasks', 'remove task <number>'")
+    console.print("Tip: Press Ctrl+C to force quit if needed.", style="italic")
 
-#     while True:
-#         try:
-#             with m as source:
-#                 console.print("Listening... (5s timeout)", style="dim")
-#                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
-#             console.print("Processing speech...", style="dim")
+    while True:
+        try:
+            with m as source:
+                console.print("Listening... (5s timeout)", style="dim")
+                audio = r.listen(source, timeout=5, phrase_time_limit=10)
+            console.print("Processing speech...", style="dim")
 
-#         except sr.WaitTimeoutError:
-#             console.print("No speech detected within 5 seconds. Listening again...", style="yellow")
-#             continue
-#         except Exception as e:
-#             console.print(f"Error during listening: {e}", style="red")
-#             console.print("Retrying in a moment...", style="dim")
-#             continue
+        except sr.WaitTimeoutError:
+            console.print("No speech detected within 5 seconds. Listening again...", style="yellow")
+            continue
+        except Exception as e:
+            console.print(f"Error during listening: {e}", style="red")
+            console.print("Retrying in a moment...", style="dim")
+            continue
 
-#         if audio is None:
-#             continue
+        if audio is None:
+            continue
 
-#         try:
-#             text = r.recognize_google(audio).lower()
-#             console.print(f"You said: [italic]{text}[/italic]")
+        try:
+            text = r.recognize_google(audio).lower()
+            console.print(f"You said: [italic]{text}[/italic]")
 
-#             if "exit" in text or "quit" in text:
-#                 console.print("Exiting voice mode.", style="bold")
-#                 break
+            if "exit" in text or "quit" in text:
+                console.print("Exiting voice mode.", style="bold")
+                break
 
-#             elif "add task" in text:
-#                 desc_start = text.find("add task") + len("add task")
-#                 desc = text[desc_start:].strip()
-#                 if not desc:
-#                     console.print("Please provide a task description after 'add task'.", style="yellow")
-#                     continue
-#                 cmd_add(desc, priority=DEFAULT_PRIORITY, tags=[], completed=False)
+            elif "add task" in text:
+                desc_start = text.find("add task") + len("add task")
+                desc = text[desc_start:].strip()
+                if not desc:
+                    console.print("Please provide a task description after 'add task'.", style="yellow")
+                    continue
+                cmd_add(desc, priority=DEFAULT_PRIORITY, tags=[], completed=False)
 
-#             elif "list tasks" in text or "show tasks" in text:
-#                 cmd_list()
+            elif "list tasks" in text or "show tasks" in text:
+                cmd_list()
 
-#             elif "remove task" in text:
-#                 num_start = text.find("remove task") + len("remove task")
-#                 num_str = text[num_start:].strip()
-#                 num_match = re.search(r'\d+', num_str)
-#                 if num_match:
-#                     index = int(num_match.group())
-#                     cmd_remove(index)
-#                 else:
-#                     console.print("Please specify a valid task number after 'remove task'.", style="yellow")
+            elif "remove task" in text:
+                num_start = text.find("remove task") + len("remove task")
+                num_str = text[num_start:].strip()
+                num_match = re.search(r'\d+', num_str)
+                if num_match:
+                    index = int(num_match.group())
+                    cmd_remove(index)
+                else:
+                    console.print("Please specify a valid task number after 'remove task'.", style="yellow")
 
-#             else:
-#                 console.print("Command not recognized. Try 'add task <description>', 'list tasks', 'remove task <number>', or 'exit'.", style="yellow")
+            else:
+                console.print("Command not recognized. Try 'add task <description>', 'list tasks', 'remove task <number>', or 'exit'.", style="yellow")
 
-#         except sr.UnknownValueError:
-#             console.print("Sorry, could not understand the audio. Please speak clearly and try again.", style="yellow")
-#             continue
-#         except sr.RequestError as e:
-#             console.print(f"Speech recognition service error: {e}", style="red")
-#             console.print("Check your internet connection and try again.", style="yellow")
-#             continue
-#         except KeyboardInterrupt:
-#             console.print("\nInterrupted by user (Ctrl+C). Exiting voice mode.", style="bold yellow")
-#             break
-#         except Exception as e:
-#             console.print(f"Unexpected error in voice processing: {e}", style="red")
-#             continue
+        except sr.UnknownValueError:
+            console.print("Sorry, could not understand the audio. Please speak clearly and try again.", style="yellow")
+            continue
+        except sr.RequestError as e:
+            console.print(f"Speech recognition service error: {e}", style="red")
+            console.print("Check your internet connection and try again.", style="yellow")
+            continue
+        except KeyboardInterrupt:
+            console.print("\nInterrupted by user (Ctrl+C). Exiting voice mode.", style="bold yellow")
+            break
+        except Exception as e:
+            console.print(f"Unexpected error in voice processing: {e}", style="red")
+            continue
 
-#     console.print("Voice mode ended.", style="bold")
+    console.print("Voice mode ended.", style="bold")
 
 def build_parser() -> argparse.ArgumentParser:
     """
