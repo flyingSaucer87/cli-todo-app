@@ -117,6 +117,17 @@ function completeTodo(idx) {
   saveTodos();
   console.log(`✓ Marked as completed: ${todos[original].description}`);
 }
+function markDone(index) {
+    const todos = getTodos();
+    if (index < 0 || index >= todos.length) {
+        console.log("❌ Invalid task index.");
+        return;
+    }
+
+    todos[index].done = true; // mark the task as done
+    saveTodos(todos);
+    console.log(`✅ Task "${todos[index].task}" marked as done.`);
+}
 
 // Clear all tasks
 function clearTodos() {
