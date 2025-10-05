@@ -18,6 +18,7 @@ if (command === "help" || args.length === 0) {
       node index.js remove <task_index>        - Removes a task by index
       node index.js edit <task_index> "New description" - Edits a task by index
       node index.js clear                      - Removes all tasks
+      node index.js done <task_index>          - Marks a task as done by index
   `);
     return;
 }
@@ -25,8 +26,12 @@ if (command === "help" || args.length === 0) {
 switch (command) {
     case "add":
         const task = args.slice(1).join(" ");
-        addTodo(task);
-        console.log(`Added new task: ${task}`);
+        if (!task.trim()) {
+            console.log("Error: Please provide a task description.");
+        } else {
+            addTodo(task);
+            console.log(`Added new task: "${task}"`);
+        }
         break;
     case "list":
         listTodos();
@@ -69,6 +74,6 @@ switch (command) {
  
     default:
         console.log(
-            'Unknown command. Use "add", "list", "remove", "edit", or "clear".'
+            'Unknown command. Use "add", "list", "remove", "edit", "clear" , or "done".'
         );
 }

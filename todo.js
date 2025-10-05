@@ -16,8 +16,9 @@ function saveTodos() {
 }
 
 // Add a new task
-function addTodo(task) {
-    todos.push(task);
+function addTodo(taskDescription) {
+    const tasks = { task: taskDescription, done: false };
+    todos.push(tasks);
     saveTodos();
 }
 
@@ -27,8 +28,9 @@ function listTodos() {
         console.log("No tasks yet!");
         return;
     }
-    todos.forEach((task, index) => {
-        console.log(`${index}: ${task}`);
+    todos.forEach((todo, index) => {
+        const status = todo.done ? "[✓]" : "[ ]";
+        console.log(`${index}: ${status} ${todo.task}`);
     });
 }
 
@@ -56,15 +58,14 @@ function editTodo(index, newDescription) {
     }
 }
 function markDone(index) {
-    const todos = getTodos();
     if (index < 0 || index >= todos.length) {
-        console.log("❌ Invalid task index.");
+        console.log("Invalid task index.");
         return;
     }
 
     todos[index].done = true; // mark the task as done
     saveTodos(todos);
-    console.log(`✅ Task "${todos[index].task}" marked as done.`);
+    console.log(`Task "${todos[index].task}" marked as done.`);
 }
 
 // Clear all tasks
