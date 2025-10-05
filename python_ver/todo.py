@@ -459,7 +459,7 @@ from collections import Counter
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
-import speech_recognition as sr
+# import speech_recognition as sr
 from auth import validate
 
 console = Console()
@@ -496,13 +496,13 @@ def save_config(config: Dict[str, Any]) -> None:
         console.print(f"Error: Could not save settings to {CONFIG_FILE}: {e}", style="red")
         sys.exit(1)
 
-def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
+def _normalize_tasks(user: str, data: Any) -> List[Dict[str, Any]]:
     """Normalize raw JSON data into a list of task dicts."""
     normalized: List[Dict[str, Any]] = []
     if isinstance(data, list):
         for item in data:
             if isinstance(item, str):  # Legacy task format: simple string
-                normalized.append({"description": item, "completed": False, "priority": DEFAULT_PRIORITY, "tags": []})
+                normalized.append({"description": item, "completed": False, "priority": DEFAULT_PRIORITY, "tags": [], "shared_with": user})
             elif isinstance(item, dict):  # New task format
                 desc = item.get("description")
                 if isinstance(desc, str):
@@ -511,19 +511,20 @@ def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
                         "completed": bool(item.get("completed", False)),
                         "priority": item.get("priority", DEFAULT_PRIORITY),
                         "tags": item.get("tags", []),
+                        "shared_with": item.get("shared_with", [user]),
                     })
             # ignore other types silently
     return normalized
 
 
-def taskload() -> List[Dict[str, Any]]:
+def taskload(user: str) -> List[Dict[str, Any]]:
     if not TASKS_FILE.exists():
         return []
 
     try:
         with TASKS_FILE.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        tasks = _normalize_tasks(data)
+        tasks = _normalize_tasks(user, data)
         # If file was legacy format, persist normalized structure
         if isinstance(data, list) and tasks and not isinstance(data[0], dict):
             tasksave(tasks)
@@ -598,9 +599,9 @@ def validate_task(description: str) -> bool:
     Returns:
         True if valid, False otherwise.
     """
-    return description and description.strip()
+    return (len(description) > 0 and len(description.strip()) > 0)
 
-def cmd_add(description: str, priority: str = DEFAULT_PRIORITY, tags: List[str] = None, completed: bool = False) -> None:
+def cmd_add(user: str, description: str, priority: str = DEFAULT_PRIORITY, tags: List[str] = None, completed: bool = False) -> None:
     if tags is None:
         tags = []
 
@@ -614,29 +615,30 @@ def cmd_add(description: str, priority: str = DEFAULT_PRIORITY, tags: List[str] 
         console.print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join(VALID_PRIORITIES)}", style="red")
         return
 
-    tasks = taskload()
+    tasks = taskload(user)
     new_task = {
         "description": description.strip(),
         "priority": priority,
         "tags": tags,
         "completed": completed,
+        "shared_with": [user]
     }
     tasks.append(new_task)
     tasksave(tasks)
     tag_str = ', '.join(tags) if tags else 'None'
     console.print(f"Added task #{len(tasks)}: [bold cyan]{description.strip()}[/bold cyan] [Priority: {priority}] [Tags: {tag_str}]")
 
-def cmd_list() -> None:
-    tasks = taskload()
-
+def cmd_list(user: str) -> None:
+    tasks = taskload(user)
+   
     if not tasks:
         console.print("No tasks.", style="italic")
         return
 
     priority_order = {"High": 0, "Medium": 1, "Low": 2}
 
-    pending = [(i+1, t) for i, t in enumerate(tasks) if not t.get("completed", False)]
-    completed = [(i+1, t) for i, t in enumerate(tasks) if t.get("completed", False)]
+    pending = [(i+1, t) for i, t in enumerate(tasks) if user in t.get("shared_with", user) and not t.get("completed", False)]
+    completed = [(i+1, t) for i, t in enumerate(tasks) if user in t.get("shared_with", user) and t.get("completed", False)]
 
     # Sort pending by priority
     pending.sort(key=lambda x: priority_order.get(x[1].get("priority", DEFAULT_PRIORITY), 1))
@@ -654,29 +656,49 @@ def cmd_list() -> None:
         for idx, t in completed:
             console.print(f"  ● {idx}. [strikethrough dim]{t['description']}[/strikethrough dim]")
 
-def cmd_remove(index: int) -> None:
-    tasks = taskload()
+def cmd_remove(user: str, task_name: str) -> None:
+    tasks = taskload(user)
     if not tasks:
         console.print("No tasks to remove.")
         return
-    if index < 1 or index > len(tasks):
-        console.print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.", style="red")
+    # if index < 1 or index > len(tasks):
+    #     console.print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.", style="red")
+    #     return
+    authorised = False
+    index = -1
+    for i, task in enumerate(tasks):
+        if task_name == task.get("description") and user in task.get("shared_with", []):
+            index = i
+            authorised = True
+            break
+    if not authorised or index == -1:
+        console.print(f"No task found with name: {task_name}")
         return
-    removed = tasks.pop(index - 1)
+    removed = tasks.pop(index)
     tasksave(tasks)
     console.print(f"Removed task #{index}: [bold red]{removed['description']}[/bold red]")
 
-def cmd_complete(index: int) -> None:
-    tasks = taskload()
+def cmd_complete(user: str, task_name: str) -> None:
+    tasks = taskload(user)
     if not tasks:
         console.print("No tasks to complete.")
         return
-    if index < 1 or index > len(tasks):
-        console.print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.", style="red")
+    # if index < 1 or index > len(tasks):
+    #     console.print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.", style="red")
+    #     return
+    authorised = False
+    index = -1
+    for i, task in enumerate(tasks):
+        if task_name == task.get("description") and user in task.get("shared_with", []):
+            index = i
+            authorised = True
+            break
+    if not authorised or index == -1:
+        console.print(f"No task found with name: {task_name}")
         return
-    task = tasks[index - 1]
+    task = tasks[index]
     if task.get("completed", False):
-        console.print(f"Task #{index} is already completed: [yellow]{task['description']}[/yellow]")
+        console.print(f"Task {task_name} is already completed: [yellow]{task['description']}[/yellow]")
         return
     task["completed"] = True
     tasksave(tasks)
@@ -698,19 +720,34 @@ def cmd_settings(dark_mode: str | None) -> None:
     status_text = "enabled" if new_status else "disabled"
     console.print(f"Dark mode has been {status_text}.")
 
-def show_stats():
-    tasks = taskload()
+def show_stats(user):
+    tasks = taskload(user)
     if not tasks:
         console.print("No tasks to analyze.")
         return
 
     # Completion Rate
-    completed = sum(1 for task in tasks if task.get("completed", False))
-    total = len(tasks)
+    completed = sum(1 for task in tasks if user in task.get("shared_with", []) and task.get("completed", False))
+    total = 0
+    priority_counts = {"Low": 0, "Medium": 0, "High": 0}
+    tag_counts = 0
+
+    # calculate the number of tasks a user has associated with him/her
+    # also the count of tasks with particular priority associated
+    for i, task in enumerate(tasks):
+        if user in task.get("shared_with", []):
+            total += 1
+            if task.get("priority", DEFAULT_PRIORITY) == "Low":
+                priority_counts["Low"] += 1
+            elif task.get("priority", DEFAULT_PRIORITY) == "Medium":
+                priority_counts["Medium"] += 1
+            else:
+                priority_counts["High"] += 1
+
     completion_percent = (completed / total) * 100 if total else 0
 
     # Priority Breakdown
-    priority_counts = Counter(task.get("priority", DEFAULT_PRIORITY) for task in tasks)
+    # priority_counts = Counter(task.get("priority", DEFAULT_PRIORITY) for task in tasks)
 
     # Tags Breakdown
     tag_counts = Counter(tag for task in tasks for tag in task.get("tags", []))
@@ -740,90 +777,90 @@ def show_stats():
 
     console.rule()
 
-def cmd_voice() -> None:
-    """Voice command mode for hands-free interaction."""
-    r = sr.Recognizer()
-    try:
-        m = sr.Microphone()
-    except Exception as e:
-        console.print(f"No microphone found: {e}", style="red")
-        return
+# def cmd_voice() -> None:
+#     """Voice command mode for hands-free interaction."""
+#     r = sr.Recognizer()
+#     try:
+#         m = sr.Microphone()
+#     except Exception as e:
+#         console.print(f"No microphone found: {e}", style="red")
+#         return
 
-    try:
-        with m as source:
-            r.adjust_for_ambient_noise(source, duration=1)
-    except Exception as e:
-        pass  # Continue anyway
+#     try:
+#         with m as source:
+#             r.adjust_for_ambient_noise(source, duration=1)
+#     except Exception as e:
+#         pass  # Continue anyway
 
-    console.print("Voice mode activated. Speak your commands clearly. Say 'exit' to quit.")
-    console.print("Supported: 'add task <description>', 'list tasks', 'remove task <number>'")
-    console.print("Tip: Press Ctrl+C to force quit if needed.", style="italic")
+#     console.print("Voice mode activated. Speak your commands clearly. Say 'exit' to quit.")
+#     console.print("Supported: 'add task <description>', 'list tasks', 'remove task <number>'")
+#     console.print("Tip: Press Ctrl+C to force quit if needed.", style="italic")
 
-    while True:
-        try:
-            with m as source:
-                console.print("Listening... (5s timeout)", style="dim")
-                audio = r.listen(source, timeout=5, phrase_time_limit=10)
-            console.print("Processing speech...", style="dim")
+#     while True:
+#         try:
+#             with m as source:
+#                 console.print("Listening... (5s timeout)", style="dim")
+#                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
+#             console.print("Processing speech...", style="dim")
 
-        except sr.WaitTimeoutError:
-            console.print("No speech detected within 5 seconds. Listening again...", style="yellow")
-            continue
-        except Exception as e:
-            console.print(f"Error during listening: {e}", style="red")
-            console.print("Retrying in a moment...", style="dim")
-            continue
+#         except sr.WaitTimeoutError:
+#             console.print("No speech detected within 5 seconds. Listening again...", style="yellow")
+#             continue
+#         except Exception as e:
+#             console.print(f"Error during listening: {e}", style="red")
+#             console.print("Retrying in a moment...", style="dim")
+#             continue
 
-        if audio is None:
-            continue
+#         if audio is None:
+#             continue
 
-        try:
-            text = r.recognize_google(audio).lower()
-            console.print(f"You said: [italic]{text}[/italic]")
+#         try:
+#             text = r.recognize_google(audio).lower()
+#             console.print(f"You said: [italic]{text}[/italic]")
 
-            if "exit" in text or "quit" in text:
-                console.print("Exiting voice mode.", style="bold")
-                break
+#             if "exit" in text or "quit" in text:
+#                 console.print("Exiting voice mode.", style="bold")
+#                 break
 
-            elif "add task" in text:
-                desc_start = text.find("add task") + len("add task")
-                desc = text[desc_start:].strip()
-                if not desc:
-                    console.print("Please provide a task description after 'add task'.", style="yellow")
-                    continue
-                cmd_add(desc, priority=DEFAULT_PRIORITY, tags=[], completed=False)
+#             elif "add task" in text:
+#                 desc_start = text.find("add task") + len("add task")
+#                 desc = text[desc_start:].strip()
+#                 if not desc:
+#                     console.print("Please provide a task description after 'add task'.", style="yellow")
+#                     continue
+#                 cmd_add(desc, priority=DEFAULT_PRIORITY, tags=[], completed=False)
 
-            elif "list tasks" in text or "show tasks" in text:
-                cmd_list()
+#             elif "list tasks" in text or "show tasks" in text:
+#                 cmd_list()
 
-            elif "remove task" in text:
-                num_start = text.find("remove task") + len("remove task")
-                num_str = text[num_start:].strip()
-                num_match = re.search(r'\d+', num_str)
-                if num_match:
-                    index = int(num_match.group())
-                    cmd_remove(index)
-                else:
-                    console.print("Please specify a valid task number after 'remove task'.", style="yellow")
+#             elif "remove task" in text:
+#                 num_start = text.find("remove task") + len("remove task")
+#                 num_str = text[num_start:].strip()
+#                 num_match = re.search(r'\d+', num_str)
+#                 if num_match:
+#                     index = int(num_match.group())
+#                     cmd_remove(index)
+#                 else:
+#                     console.print("Please specify a valid task number after 'remove task'.", style="yellow")
 
-            else:
-                console.print("Command not recognized. Try 'add task <description>', 'list tasks', 'remove task <number>', or 'exit'.", style="yellow")
+#             else:
+#                 console.print("Command not recognized. Try 'add task <description>', 'list tasks', 'remove task <number>', or 'exit'.", style="yellow")
 
-        except sr.UnknownValueError:
-            console.print("Sorry, could not understand the audio. Please speak clearly and try again.", style="yellow")
-            continue
-        except sr.RequestError as e:
-            console.print(f"Speech recognition service error: {e}", style="red")
-            console.print("Check your internet connection and try again.", style="yellow")
-            continue
-        except KeyboardInterrupt:
-            console.print("\nInterrupted by user (Ctrl+C). Exiting voice mode.", style="bold yellow")
-            break
-        except Exception as e:
-            console.print(f"Unexpected error in voice processing: {e}", style="red")
-            continue
+#         except sr.UnknownValueError:
+#             console.print("Sorry, could not understand the audio. Please speak clearly and try again.", style="yellow")
+#             continue
+#         except sr.RequestError as e:
+#             console.print(f"Speech recognition service error: {e}", style="red")
+#             console.print("Check your internet connection and try again.", style="yellow")
+#             continue
+#         except KeyboardInterrupt:
+#             console.print("\nInterrupted by user (Ctrl+C). Exiting voice mode.", style="bold yellow")
+#             break
+#         except Exception as e:
+#             console.print(f"Unexpected error in voice processing: {e}", style="red")
+#             continue
 
-    console.print("Voice mode ended.", style="bold")
+#     console.print("Voice mode ended.", style="bold")
 
 def build_parser() -> argparse.ArgumentParser:
     """
@@ -860,11 +897,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("list", help="List all tasks sorted by priority")
 
-    p_remove = sub.add_parser("remove", help="Remove a task by its index (1-based)")
-    p_remove.add_argument("index", type=int, help="Enter task index to remove")
+    p_remove = sub.add_parser("remove", help="Remove a task by its description")
+    p_remove.add_argument("task_name", type=str, help="Enter task description to remove")
 
-    p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
-    p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
+    p_complete = sub.add_parser("complete", help="Mark a task as completed by its description")
+    p_complete.add_argument("task_name", type=str, help="Enter task name to mark complete")
 
     p_stats = sub.add_parser("stats", help="Display task analytics (completion rate, priority, tags)")
 
@@ -880,7 +917,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: List[str] | None = None) -> None:
+def main(user: str, argv: List[str] | None = None) -> None:
     """
     Main entry point for the CLI application.
 
@@ -891,15 +928,15 @@ def main(argv: List[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.cmd == "add":
-        cmd_add(args.description, args.priority, args.tags, args.completed)
+        cmd_add(user, args.description, args.priority, args.tags, args.completed)
     elif args.cmd == "list":
-        cmd_list()
+        cmd_list(user)
     elif args.cmd == "remove":
-        cmd_remove(args.index)
+        cmd_remove(user, args.task_name)
     elif args.cmd == "complete":
-        cmd_complete(args.index)
+        cmd_complete(user, args.task_name)
     elif args.cmd == "stats":
-        show_stats()
+        show_stats(user)
     elif args.cmd == "settings":
         cmd_settings(args.dark_mode)
     elif args.cmd == "voice":
@@ -907,5 +944,6 @@ def main(argv: List[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    if validate():
-        main()
+    user, valid = validate()
+    if valid:
+        main(user)
