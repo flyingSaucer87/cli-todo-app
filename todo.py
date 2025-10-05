@@ -27,15 +27,21 @@ def add_todo(task, priority="Medium", tags=None):
         tags = []
 
     todos = load_todos()
-    todos.append({"task": task, "priority": priority, "tags": tags})
+    todos.append({"task": task, "priority": priority, "tags": tags, "completed": False})
     save_todos(todos)
     print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
 
-def list_todos(filter_tag=None, sort_by=None):
+# List all tasks sorted by priority and optionally filtered by tag
+def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
         return
+
+    if not show_completed:
+        todos = [t for t in todos if not t.get("completed", False)]
+    else:
+        todos = [t for t in todos if t.get("completed", False)]
 
     if filter_tag:
         todos = [t for t in todos if filter_tag in t.get("tags", [])]
@@ -43,7 +49,7 @@ def list_todos(filter_tag=None, sort_by=None):
     if sort_by == "name":
         todos.sort(key=lambda x: x.get("task", "").lower())
     elif sort_by == "due":
-        todos.sort(key=lambda x: x.get("due", ""))  
+        todos.sort(key=lambda x: x.get("due", "")) 
     else:
         priority_order = {"High": 0, "Medium": 1, "Low": 2}
         todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
@@ -51,7 +57,9 @@ def list_todos(filter_tag=None, sort_by=None):
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
         due = task.get("due", "N/A")
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}]")
+        status = "✅ Done" if task.get("completed") else "⏳ Pending"
+        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
+
 # Remove a task by index
 def remove_todo(index):
     todos = load_todos()
@@ -83,6 +91,15 @@ def load_plugins():
                     print(f"⚠️ Failed to load plugin {plugin_name}: {e}")
     return plugins
 
+def complete_todo(index):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        todos[index]["completed"] = True
+        save_todos(todos)
+        print(f"✅ Marked as done: {todos[index]['task']}")
+    else:
+        print("Invalid task index.")
+
 # Command-line interface
 def main():
     if len(sys.argv) < 2:
@@ -91,6 +108,8 @@ def main():
         print("  python todo.py list [--tag work] [--sort name|due]")
         print("  python todo.py remove <index>")
         print("  python todo.py clear")
+        print("  python todo.py complete <index>")
+        print("  python todo.py list --completed")git add todo.py
         print("  python todo.py <plugin_name> [args...]")
         return
 
@@ -133,6 +152,7 @@ def main():
     elif command == "list":
         filter_tag = None
         sort_by = None
+        show_completed = "--completed" in sys.argv
 
         if "--tag" in sys.argv:
             tag_index = sys.argv.index("--tag")
@@ -144,7 +164,7 @@ def main():
             if sort_index + 1 < len(sys.argv):
                 sort_by = sys.argv[sort_index + 1]
 
-        list_todos(filter_tag, sort_by)
+        list_todos(filter_tag, sort_by, show_completed)
 
     elif command == "remove" and len(sys.argv) == 3:
         try:
