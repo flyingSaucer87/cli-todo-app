@@ -17,7 +17,6 @@ def load_json(key, filepath='auth.json'):
     
 users = load_json('users')
 
-
 def validate():
     last_login = load_json('last_login', 'last_login.json')
     print("============Validating...============\n")
@@ -25,13 +24,14 @@ def validate():
     if username not in users["users"]:
         password = input("Enter a strong password: ")
         register(username, password)
-        return authenticate(username, password, last_login)
+        return [username, authenticate(username, password, last_login)]
     else:
         if username not in last_login["last_login"] or datetime.utcnow() - datetime.fromisoformat(last_login["last_login"][username]) > timedelta(hours=4):
             password = input("Enter your password: ")
-            return authenticate(username, password, last_login)
+            return [username, authenticate(username, password, last_login)]
         else:
-            return True
+            return [username, True]
+        
 
 def register(username, password):
     hash = ph.hash(password)
