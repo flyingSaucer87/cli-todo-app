@@ -66,3 +66,7 @@ def run(args):
 
     if not found_tasks:
         print("\n🎉 No high-priority tasks found! Great job!")
+
+
+if __name__ == "__main__":
+    run([])
