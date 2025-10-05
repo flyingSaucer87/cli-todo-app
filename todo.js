@@ -55,6 +55,17 @@ function editTodo(index, newDescription) {
         console.log("Invalid task index.");
     }
 }
+function markDone(index) {
+    const todos = getTodos();
+    if (index < 0 || index >= todos.length) {
+        console.log("❌ Invalid task index.");
+        return;
+    }
+
+    todos[index].done = true; // mark the task as done
+    saveTodos(todos);
+    console.log(`✅ Task "${todos[index].task}" marked as done.`);
+}
 
 // Clear all tasks
 function clearTodos() {
@@ -65,4 +76,4 @@ function clearTodos() {
 // Initialize tasks on startup
 loadTodos();
 
-module.exports = { addTodo, listTodos, removeTodo, editTodo, clearTodos };
+module.exports = { addTodo, listTodos, removeTodo, editTodo, markDone, clearTodos };

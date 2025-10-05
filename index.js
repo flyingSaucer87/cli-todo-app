@@ -3,6 +3,7 @@ const {
     listTodos,
     removeTodo,
     editTodo,
+    markDone,
     clearTodos,
 } = require("./todo");
 const args = process.argv.slice(2);
@@ -56,6 +57,16 @@ switch (command) {
         clearTodos();
         console.log("All tasks have been cleared.");
         break;
+    case "done":
+        const doneIndex = parseInt(args[1], 10);
+        if (isNaN(doneIndex)) {
+            console.log("Error: Please provide a valid task index.");
+            console.log('Usage: node index.js done <task_index>');
+        } else {
+            markDone(doneIndex);
+        }
+        break;
+ 
     default:
         console.log(
             'Unknown command. Use "add", "list", "remove", "edit", or "clear".'
