@@ -98,6 +98,7 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None)
         tags = []
 
     todos = load_todos()
+    todos.append({"task": task, "priority": priority, "tags": tags, "completed": False})
     due_date_obj = None
 
     # If due date is provided, ensure it is a string in the format YYYY-MM-DD
@@ -126,6 +127,8 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None)
     todos.append(task_obj)
     save_todos(todos)
 
+# List all tasks sorted by priority and optionally filtered by tag
+def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
     due_str = f"[Due: {due_date_obj.strftime('%Y-%m-%d')}]" if due_date_obj else ""
     rec_str = f"[Recurrence: {format_recurrence(recurrence_obj)}]" if recurrence_obj else ""
@@ -139,6 +142,11 @@ def list_todos(filter_tag=None, sort_by=None):
         print("No tasks yet!")
         return
 
+    if not show_completed:
+        todos = [t for t in todos if not t.get("completed", False)]
+    else:
+        todos = [t for t in todos if t.get("completed", False)]
+
     if filter_tag:
         todos = [t for t in todos if filter_tag in t.get("tags", [])]
         if not todos:
@@ -148,13 +156,16 @@ def list_todos(filter_tag=None, sort_by=None):
     if sort_by == "name":
         todos.sort(key=lambda x: x.get("task", "").lower())
     elif sort_by == "due":
-        todos.sort(key=lambda x: x.get("due", ""))  
+        todos.sort(key=lambda x: x.get("due", "")) 
     else:
         priority_order = {"High": 0, "Medium": 1, "Low": 2}
         todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
+        due = task.get("due", "N/A")
+        status = "✅ Done" if task.get("completed") else "⏳ Pending"
+        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
         tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
         
         due_date = task.get("due_date")
@@ -206,7 +217,6 @@ def remove_todo(index):
             print(f"{i}: {task['task']} (Due: {due_date_str})")
     else:
         print("Invalid task index.")
-
 
 # Check and notify if any tasks are due today
 def check_due_tasks(todos):
@@ -272,6 +282,15 @@ def edit_todo(index, new_description):
     else:
         print("Invalid task index.")
 
+def complete_todo(index):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        todos[index]["completed"] = True
+        save_todos(todos)
+        print(f"✅ Marked as done: {todos[index]['task']}")
+    else:
+        print("Invalid task index.")
+
 # Command-line interface
 def main():
     if len(sys.argv) < 2:
@@ -284,6 +303,8 @@ def main():
         print("  python todo.py remove <index>")
         print("  python todo.py edit <index> --new-description \"New description\"")
         print("  python todo.py clear")
+        print("  python todo.py complete <index>")
+        print("  python todo.py list --completed")git add todo.py
         print("  python todo.py <plugin_name> [args...]")
         return
 
@@ -340,6 +361,9 @@ def main():
 
     elif command == "list":
         filter_tag = None
+        sort_by = None
+        show_completed = "--completed" in sys.argv
+
         if "--tag" in sys.argv:
             tag_index = sys.argv.index("--tag")
             if tag_index + 1 < len(sys.argv):
@@ -353,13 +377,15 @@ def main():
             return
         search_term = " ".join(sys.argv[2:])
         search_todos(search_term)
+        list_todos(filter_tag, sort_by, show_completed)
 
+    elif command == "remove" and len(sys.argv) == 3:
     elif command == "remove":
         if len(sys.argv) != 3:
             print("Error: Please provide the index of the task to remove.")
             print("Usage: python todo.py remove <index>")
             return
-        
+
         try:
             index = int(sys.argv[2])
         except ValueError:
