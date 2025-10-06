@@ -17,8 +17,14 @@ show_completed = False
 def load_todos():
     if os.path.exists(FILE_PATH):
         with open(FILE_PATH, "r") as f:
-            return json.load(f)
+            todos = json.load(f)
+            # Remove tasks missing 'task' or with empty descriptions
+            valid_todos = [t for t in todos if "task" in t and t["task"].strip()]
+            if len(valid_todos) != len(todos):
+                save_todos(valid_todos)  # save cleaned list
+            return valid_todos
     return []
+
 
 # Save tasks to JSON file
 def save_todos(todos):
@@ -96,6 +102,10 @@ def calculate_next_due(due_date, recurrence):
 
 # Add a new task with optional priority, tags, due_date, recurrence
 def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None):
+    # Validate non-empty task description
+    if not task or not task.strip():
+        print("Error: Task description cannot be empty.")
+        return
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -194,21 +204,16 @@ def list_todos(filter_tag=None, sort_by=None):
         todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
-        tags = ", ".join(task.get("tags", []))
-        due = task.get("due", "N/A")
-        status = "✅ Done" if task.get("completed") else "⏳ Pending"
-        dynamic_priority = adjust_priority_by_due_date(task)
-        print(f"{i}: {task.get('task', '<No task description>')} [Priority: {dynamic_priority}] [Tags: {tags}] [Due: {due}] [{status}]")
-
+        tags = ", ".join(task.get("tags", [])) if task.get("tags") else ""
         tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
-        
+
         due_date = task.get("due_date")
         due_str = f"[Due: {due_date}]" if due_date else "[Due: None]"
-        
-        recurrence = task.get("recurrence")
-        rec_str = f"[Recurrence: {format_recurrence(recurrence)}]"
-        
+
+        rec_str = f"[Recurrence: {format_recurrence(task.get('recurrence'))}]"
+
         print(f"{i}: {task.get('task', '<No task description>')} [Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str}")
+
 
 
 # Search tasks by text or tag
