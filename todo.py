@@ -495,7 +495,14 @@ def main():
 
     elif command == "clear":
         clear_todos()
-        
+
+    elif command == "complete" and len(sys.argv) == 3:
+        try:
+            index = int(sys.argv[2])
+            complete_todo(index)
+        except ValueError:
+            print("Invalid index. Please provide a number.")
+
     else:
         print(f"Error: Unknown command '{command}'.")
         print("Valid commands are: add, list, remove, clear.")
