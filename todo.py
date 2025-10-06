@@ -5,6 +5,13 @@ from datetime import datetime
 from datetime import datetime, timedelta
 
 FILE_PATH = "todos.json"
+tags = []
+due_date_obj = None
+recurrence_obj = None
+task = {}
+priority = 1
+show_completed = False
+
 
 # Load tasks from JSON file
 def load_todos():
@@ -127,6 +134,31 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None)
     todos.append(task_obj)
     save_todos(todos)
 
+from datetime import datetime, timedelta
+
+def adjust_priority_by_due_date(task):
+    """
+    Returns auto-adjusted priority if the task has a due date:
+      - Due within 1 day: High
+      - Due within 3 days: Medium
+      - Otherwise: original priority (default: Medium)
+    """
+    due = task.get("due") or task.get("due_date")
+    if not due:
+        return task.get("priority", "Medium")
+    try:
+        due_dt = datetime.strptime(due, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return task.get("priority", "Medium")
+    delta = due_dt - datetime.now()
+    if delta <= timedelta(days=1):
+        return "High"
+    elif delta <= timedelta(days=3):
+        return "Medium"
+    else:
+        return task.get("priority", "Medium")
+
+
 # List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
@@ -165,7 +197,9 @@ def list_todos(filter_tag=None, sort_by=None):
         tags = ", ".join(task.get("tags", []))
         due = task.get("due", "N/A")
         status = "✅ Done" if task.get("completed") else "⏳ Pending"
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
+        dynamic_priority = adjust_priority_by_due_date(task)
+        print(f"{i}: {task.get('task', '<No task description>')} [Priority: {dynamic_priority}] [Tags: {tags}] [Due: {due}] [{status}]")
+
         tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
         
         due_date = task.get("due_date")
@@ -174,7 +208,8 @@ def list_todos(filter_tag=None, sort_by=None):
         recurrence = task.get("recurrence")
         rec_str = f"[Recurrence: {format_recurrence(recurrence)}]"
         
-        print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str}")
+        print(f"{i}: {task.get('task', '<No task description>')} [Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str}")
+
 
 # Search tasks by text or tag
 def search_todos(search_term):
@@ -304,7 +339,7 @@ def main():
         print("  python todo.py edit <index> --new-description \"New description\"")
         print("  python todo.py clear")
         print("  python todo.py complete <index>")
-        print("  python todo.py list --completed")git add todo.py
+        print("  python todo.py list --completed")
         print("  python todo.py <plugin_name> [args...]")
         return
 
@@ -379,7 +414,6 @@ def main():
         search_todos(search_term)
         list_todos(filter_tag, sort_by, show_completed)
 
-    elif command == "remove" and len(sys.argv) == 3:
     elif command == "remove":
         if len(sys.argv) != 3:
             print("Error: Please provide the index of the task to remove.")
