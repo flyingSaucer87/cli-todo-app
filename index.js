@@ -47,6 +47,54 @@ function parseArgs(args) {
   return parsed;
 }
 
+
+const admin = require('firebase-admin');
+admin.initializeApp();
+const db = admin.firestore();
+
+// Example structure: user -> task
+db.collection('users').doc(userId).set({
+  username: "john_doe",
+  email: "john@example.com"
+});
+
+
+db.collection('tasks').add({
+  title: 'Buy Groceries',
+  description: 'Get milk, bread, and eggs.',
+  due_date: '2025-10-07',
+  assigned_to: 'user123',
+  completed: false,
+  shared_with: ['user123', 'user456']
+});
+
+
+const userTasks = await db.collection('tasks').where('shared_with', 'array-contains', userId).get();
+
+
+const userTasks = await db.collection('tasks')
+  .where('assigned_to', '==', userId)
+  .or('shared_with', 'array-contains', userId)
+  .get();
+
+
+db.collection('tasks').onSnapshot(snapshot => {
+  snapshot.docChanges().forEach(change => {
+    if (change.type === 'added') {
+      console.log("New task: ", change.doc.data());
+    }
+    if (change.type === 'modified') {
+      console.log("Modified task: ", change.doc.data());
+    }
+    if (change.type === 'removed') {
+      console.log("Removed task: ", change.doc.data());
+    }
+  });
+});
+
+
+
+
 const parsed = parseArgs(args.slice(1));
 
 switch (command) {
