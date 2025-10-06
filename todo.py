@@ -1,7 +1,9 @@
 import json
 import os
 import sys
+import sqlite3
 from datetime import datetime, timedelta
+
 # Import both functions from your calendar plugin
 from plugins.google_calendar import add_to_calendar, fetch_upcoming_events
 
@@ -11,10 +13,15 @@ FILE_PATH = "todos.json"
 def load_todos():
     if os.path.exists(FILE_PATH):
         with open(FILE_PATH, "r") as f:
-            return json.load(f)
+            todos = json.load(f)
+            # Remove tasks missing 'task' or with empty descriptions
+            valid_todos = [t for t in todos if "task" in t and t["task"].strip()]
+            if len(valid_todos) != len(todos):
+                save_todos(valid_todos)  # save cleaned list
+            return valid_todos
     return []
 
-# Save tasks
+# Save tasks to JSON file
 def save_todos(todos):
     with open(FILE_PATH, "w") as f:
         json.dump(todos, f, indent=2)
@@ -48,6 +55,25 @@ def format_recurrence(recurrence):
         unit_name += "s"
     return f"Every {interval} {unit_name}"
 
+# --- Functions from the 'main' branch for database interaction ---
+def create_task(task_name, due_date, status='pending'):
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+    # Note: 'time' module was not imported, assuming this is a work in progress.
+    # For now, we will use datetime.now().timestamp()
+    cursor.execute("INSERT INTO tasks (name, due_date, status, timestamp) VALUES (?, ?, ?, ?)",
+                   (task_name, due_date, status, datetime.now().timestamp()))
+    conn.commit()
+    conn.close()
+
+def get_all_tasks():
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks")
+    tasks = cursor.fetchall()
+    conn.close()
+    return tasks
+
 # Calculate next due date
 def calculate_next_due(due_date, recurrence):
     due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
@@ -68,8 +94,13 @@ def calculate_next_due(due_date, recurrence):
         next_date = due_date_obj
     return next_date.strftime("%Y-%m-%d")
 
-# Add new task
+# Add a new task with combined features
 def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None, auto_sync=True):
+    # Validate non-empty task description (from main)
+    if not task or not task.strip():
+        print("Error: Task description cannot be empty.")
+        return
+        
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -100,26 +131,43 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None,
         "recurrence": recurrence_obj,
         "next_due": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
         "completed": False,
-        "synced": False # Initialize as not synced
+        "synced": False  # Initialize as not synced (from your branch)
     }
     
-    # Google Calendar Sync (if due date is present and auto_sync is on)
+    # Google Calendar Sync (from your branch)
     if due_date_obj and auto_sync:
         print(f"Syncing '{task}' to Google Calendar...")
         try:
             add_to_calendar(task, due_date_obj)
-            task_obj['synced'] = True # Mark as synced
+            task_obj['synced'] = True  # Mark as synced
             print("📅 Task synced to Google Calendar successfully!")
         except Exception as e:
             print(f"❌ Failed to sync with Google Calendar: {e}")
             
     todos.append(task_obj)
     save_todos(todos)
-
+    
     print(f"✅ Added: {task} [Priority: {priority}]")
 
-# List tasks
-def list_todos(filter_tag=None):
+# --- Functions from the 'main' branch for advanced listing ---
+def adjust_priority_by_due_date(task):
+    due = task.get("due") or task.get("due_date")
+    if not due:
+        return task.get("priority", "Medium")
+    try:
+        due_dt = datetime.strptime(due, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return task.get("priority", "Medium")
+    delta = due_dt - datetime.now()
+    if delta <= timedelta(days=1):
+        return "High"
+    elif delta <= timedelta(days=3):
+        return "Medium"
+    else:
+        return task.get("priority", "Medium")
+
+# List tasks (using the more advanced version from 'main')
+def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
@@ -141,7 +189,28 @@ def list_todos(filter_tag=None):
         status = "✅ Done" if task.get("completed") else "⏳ Pending"
         print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [Recurrence: {rec}] [{status}]")
 
-# Remove task
+# Search tasks by text or tag (from 'main')
+def search_todos(search_term):
+    todos = load_todos()
+    if not todos:
+        print("No tasks found!")
+        return
+
+    matching_tasks = [
+        task for task in todos
+        if search_term.lower() in task['task'].lower() or search_term.lower() in [tag.lower() for tag in task.get("tags", [])]
+    ]
+
+    if not matching_tasks:
+        print(f"No tasks found matching '{search_term}'.")
+        return
+
+    print(f"Found {len(matching_tasks)} matching task(s) for '{search_term}':")
+    for i, task in enumerate(matching_tasks):
+        tags = ", ".join(task.get("tags", []))
+        print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] [Tags: {tags}]")
+
+# Remove a task by index
 def remove_todo(index):
     todos = load_todos()
     if 0 <= index < len(todos):
@@ -166,11 +235,11 @@ def complete_todo(index):
     else:
         print("Invalid task index.")
 
-# Function to sync all due tasks to Google Calendar
+# --- Calendar Sync functions from your branch ---
 def sync_all_tasks_to_calendar():
     todos = load_todos()
     tasks_to_sync = [
-        task for task in todos 
+        task for task in todos
         if task.get("due_date") and not task.get("completed") and not task.get("synced")
     ]
     
@@ -185,14 +254,13 @@ def sync_all_tasks_to_calendar():
             print(f"Syncing '{task['task']}'...")
             due_date_obj = datetime.strptime(task['due_date'], "%Y-%m-%d").date()
             add_to_calendar(task['task'], due_date_obj)
-            task['synced'] = True # Mark the task as synced to prevent duplicates
+            task['synced'] = True  # Mark the task as synced to prevent duplicates
         except Exception as e:
             print(f"❌ Failed to sync '{task['task']}': {e}")
             
     save_todos(todos)
     print("Sync complete.")
 
-# Function to pull tasks from Google Calendar
 def pull_tasks_from_calendar():
     print("Fetching upcoming events from Google Calendar...")
     events = fetch_upcoming_events()
@@ -206,15 +274,14 @@ def pull_tasks_from_calendar():
         return
 
     todos = load_todos()
-    existing_tasks = {t['task'].lower() for t in todos} # Use .lower() for case-insensitive check
+    existing_tasks = {t['task'].lower() for t in todos}
     new_tasks_added = 0
 
     for event in events:
         task_name = event['summary']
         if task_name.lower() not in existing_tasks:
-            # The start object can contain 'dateTime' (for timed events) or 'date' (for all-day events)
             start = event['start'].get('dateTime', event['start'].get('date'))
-            due_date = start.split('T')[0] # Get just the YYYY-MM-DD part
+            due_date = start.split('T')[0]
 
             # Add the task without auto-syncing it back to the calendar
             add_todo(task=task_name, due_date=due_date, auto_sync=False)
@@ -226,18 +293,19 @@ def pull_tasks_from_calendar():
     else:
         print(f"Import complete. Added {new_tasks_added} new tasks.")
 
-
 # CLI
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python todo.py add \"Task name\" --priority High --tags work --due 2025-10-07")
         print("  python todo.py list [--tag work]")
+        print("  python todo.py list --completed")
         print("  python todo.py remove <index>")
         print("  python todo.py complete <index>")
         print("  python todo.py clear")
         print("  python todo.py sync calendar")
         print("  python todo.py pull calendar")
+        print("  python todo.py <plugin_name> [args...]")
         return
 
     command = sys.argv[1]
@@ -283,11 +351,21 @@ def main():
         remove_todo(int(sys.argv[2]))
 
     elif command == "complete":
-        complete_todo(int(sys.argv[2]))
+        # Using the improved version from 'main' with error handling
+        if len(sys.argv) == 3:
+            try:
+                index = int(sys.argv[2])
+                complete_todo(index)
+            except ValueError:
+                print("Invalid index. Please provide a number.")
+        else:
+            print("Usage: python todo.py complete <index>")
+
 
     elif command == "clear":
         clear_todos()
 
+    # Commands from your branch
     elif command == "sync":
         if len(sys.argv) > 2 and sys.argv[2] == "calendar":
             sync_all_tasks_to_calendar()
