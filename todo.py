@@ -125,7 +125,7 @@ def main():
         print("  python todo.py remove <index>")
         print("  python todo.py clear")
         print("  python todo.py complete <index>")
-        print("  python todo.py list --completed")git add todo.py
+        print("  python todo.py list --completed")
         print("  python todo.py <plugin_name> [args...]")
         return
 
