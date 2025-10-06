@@ -3,6 +3,28 @@ const fs = require("fs");
 const filePath = "todos.json";
 let todos = [];
 
+const taskSchema = {
+    id: Number,
+    name: String,
+    due_date: String,
+    status: String,
+    priority: String,
+    created_at: Date,
+    updated_at: Date,
+    versions: [ // Array of task versions
+        {
+            version_number: Number,
+            name: String,
+            due_date: String,
+            status: String,
+            priority: String,
+            modified_at: Date,
+            modified_by: String // Track who made the change (optional)
+        }
+    ]
+}
+
+
 // Load tasks from the JSON file
 function loadTodos() {
   if (fs.existsSync(filePath)) {
