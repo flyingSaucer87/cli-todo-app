@@ -25,6 +25,31 @@ const taskSchema = {
 }
 
 
+const showTaskHistory = (taskId) => {
+    const versions = getTaskVersions(taskId);  // Assume this fetches all versions for the task
+
+    if (versions.length === 0) {
+        console.log("No history available for this task.");
+    } else {
+        console.log("Task History:");
+        versions.forEach((version, index) => {
+            console.log(`#${index + 1} - Version: ${version.version_number}`);
+            console.log(`Name: ${version.name}`);
+            console.log(`Due Date: ${version.due_date}`);
+            console.log(`Status: ${version.status}`);
+            console.log(`Priority: ${version.priority}`);
+            console.log(`Modified at: ${new Date(version.modified_at).toLocaleString()}`);
+            console.log('------------------------------------');
+        });
+    }
+}
+
+const getTaskVersions = (taskId) => {
+    return db.all("SELECT * FROM task_versions WHERE task_id = ? ORDER BY version_number DESC", [taskId]);
+}
+
+
+
 // Load tasks from the JSON file
 function loadTodos() {
   if (fs.existsSync(filePath)) {
