@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import sqlite3
 from datetime import datetime
 from datetime import datetime, timedelta
 
@@ -71,6 +72,25 @@ def format_recurrence(recurrence):
         unit_name += "s"
     
     return f"Every {interval} {unit_name}"
+
+def create_task(task_name, due_date, status='pending'):
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO tasks (name, due_date, status, timestamp) VALUES (?, ?, ?, ?)",
+                   (task_name, due_date, status, time.time()))
+    conn.commit()
+    conn.close()
+
+def get_all_tasks():
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks")
+    tasks = cursor.fetchall()
+    conn.close()
+    return tasks
+
+cursor.execute()
+
 
 def calculate_next_due(due_date, recurrence):
     if isinstance(due_date, str):
