@@ -230,5 +230,145 @@
       "verbose",
       "test"
     ]
+  },
+  {
+    "task": "To die",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "To die",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": null,
+    "recurrence": null,
+    "next_due": null
+  },
+  {
+    "task": "Finish assignment",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Finish assignment",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-09",
+    "recurrence": null,
+    "next_due": "2025-10-09"
+  },
+  {
+    "task": "Due soon!",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Due soon!",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-07",
+    "recurrence": null,
+    "next_due": "2025-10-07"
+  },
+  {
+    "task": "Due in 3 days",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Due in 3 days",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-09",
+    "recurrence": null,
+    "next_due": "2025-10-09"
+  },
+  {
+    "task": "Far away",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Far away",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-15",
+    "recurrence": null,
+    "next_due": "2025-10-15"
+  },
+  {
+    "task": "To die",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "To die",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": null,
+    "recurrence": null,
+    "next_due": null
+  },
+  {
+    "task": "Finish assignment",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Finish assignment",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-09",
+    "recurrence": null,
+    "next_due": "2025-10-09"
+  },
+  {
+    "task": "Due soon!",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Due soon!",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-07",
+    "recurrence": null,
+    "next_due": "2025-10-07"
+  },
+  {
+    "task": "Due in 3 days",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Due in 3 days",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-09",
+    "recurrence": null,
+    "next_due": "2025-10-09"
+  },
+  {
+    "task": "Far away",
+    "priority": "Medium",
+    "tags": [],
+    "completed": false
+  },
+  {
+    "task": "Far away",
+    "priority": "Medium",
+    "tags": [],
+    "due_date": "2025-10-15",
+    "recurrence": null,
+    "next_due": "2025-10-15"
   }
 ]
