@@ -240,6 +240,22 @@ def search_todos(search_term):
         tags = ", ".join(task.get("tags", []))
         print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] [Tags: {tags}]")
 
+        # Summary message
+    all_tasks = load_todos()
+    completed = len([t for t in all_tasks if t.get("completed")])
+    pending = len([t for t in all_tasks if not t.get("completed")])
+    high_priority = len([t for t in all_tasks if not t.get("completed") and t.get("priority") == "High"])
+
+    print("\n--- Summary ---")
+    if pending == 0:
+        print("🎉 Nice! All your tasks are completed.")
+    else:
+        print(f"📝 You have {pending} pending task{'s' if pending > 1 else ''}.")
+        if high_priority > 0:
+            print(f"🔥 {high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
+        else:
+            print("👍 No high-priority tasks pending.")
+
 # Remove a task by index
 def remove_todo(index):
     todos = load_todos()
