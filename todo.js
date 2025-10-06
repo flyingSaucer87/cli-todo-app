@@ -48,6 +48,10 @@ const getTaskVersions = (taskId) => {
     return db.all("SELECT * FROM task_versions WHERE task_id = ? ORDER BY version_number DESC", [taskId]);
 }
 
+const rollbackTaskCommand = (taskId, versionNumber) => {
+    rollbackTask(taskId, versionNumber);
+    console.log(`Task ${taskId} has been rolled back to version ${versionNumber}.`);
+}
 
 
 // Load tasks from the JSON file
