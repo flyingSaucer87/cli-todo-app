@@ -1,5 +1,5 @@
 const { addTodo, listTodos, removeTodo, editTodo, completeTodo, clearTodos } = require('./todo');
-
+const exporter = require('./exporter');
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -46,6 +46,54 @@ function parseArgs(args) {
   
   return parsed;
 }
+
+
+const admin = require('firebase-admin');
+admin.initializeApp();
+const db = admin.firestore();
+
+// Example structure: user -> task
+db.collection('users').doc(userId).set({
+  username: "john_doe",
+  email: "john@example.com"
+});
+
+
+db.collection('tasks').add({
+  title: 'Buy Groceries',
+  description: 'Get milk, bread, and eggs.',
+  due_date: '2025-10-07',
+  assigned_to: 'user123',
+  completed: false,
+  shared_with: ['user123', 'user456']
+});
+
+
+const userTasks = await db.collection('tasks').where('shared_with', 'array-contains', userId).get();
+
+
+const userTasks = await db.collection('tasks')
+  .where('assigned_to', '==', userId)
+  .or('shared_with', 'array-contains', userId)
+  .get();
+
+
+db.collection('tasks').onSnapshot(snapshot => {
+  snapshot.docChanges().forEach(change => {
+    if (change.type === 'added') {
+      console.log("New task: ", change.doc.data());
+    }
+    if (change.type === 'modified') {
+      console.log("Modified task: ", change.doc.data());
+    }
+    if (change.type === 'removed') {
+      console.log("Removed task: ", change.doc.data());
+    }
+  });
+});
+
+
+
 
 const parsed = parseArgs(args.slice(1));
 
@@ -105,6 +153,27 @@ switch (command) {
     clearTodos();
     console.log('All tasks have been cleared.');
     break;
+
+
+  if (command === 'export') {
+  // node index.js export csv path/to/out.csv
+  const format = process.argv[3] || 'csv';
+  const out = process.argv[4] || `todos.${format}`;
+  exporter.exportTodos(format, out);
+  process.exit(0);
+}
+
+if (command === 'import') {
+  // node index.js import csv path/to/in.csv
+  const format = process.argv[3] || 'csv';
+  const infile = process.argv[4];
+  if (!infile) {
+    console.error('Usage: node index.js import <csv|md> <file>');
+    process.exit(1);
+  }
+  exporter.importTodos(format, infile);
+  process.exit(0);
+}
 
   default:
     console.log('Unknown command. Use "help" for usage information.');

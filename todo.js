@@ -3,6 +3,57 @@ const fs = require("fs");
 const filePath = "todos.json";
 let todos = [];
 
+const taskSchema = {
+    id: Number,
+    name: String,
+    due_date: String,
+    status: String,
+    priority: String,
+    created_at: Date,
+    updated_at: Date,
+    versions: [ // Array of task versions
+        {
+            version_number: Number,
+            name: String,
+            due_date: String,
+            status: String,
+            priority: String,
+            modified_at: Date,
+            modified_by: String // Track who made the change (optional)
+        }
+    ]
+}
+
+
+const showTaskHistory = (taskId) => {
+    const versions = getTaskVersions(taskId);  // Assume this fetches all versions for the task
+
+    if (versions.length === 0) {
+        console.log("No history available for this task.");
+    } else {
+        console.log("Task History:");
+        versions.forEach((version, index) => {
+            console.log(`#${index + 1} - Version: ${version.version_number}`);
+            console.log(`Name: ${version.name}`);
+            console.log(`Due Date: ${version.due_date}`);
+            console.log(`Status: ${version.status}`);
+            console.log(`Priority: ${version.priority}`);
+            console.log(`Modified at: ${new Date(version.modified_at).toLocaleString()}`);
+            console.log('------------------------------------');
+        });
+    }
+}
+
+const getTaskVersions = (taskId) => {
+    return db.all("SELECT * FROM task_versions WHERE task_id = ? ORDER BY version_number DESC", [taskId]);
+}
+
+const rollbackTaskCommand = (taskId, versionNumber) => {
+    rollbackTask(taskId, versionNumber);
+    console.log(`Task ${taskId} has been rolled back to version ${versionNumber}.`);
+}
+
+
 // Load tasks from the JSON file
 function loadTodos() {
   if (fs.existsSync(filePath)) {

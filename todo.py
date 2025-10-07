@@ -2,12 +2,21 @@ import json
 import os
 import sys
 import sqlite3
+
+from datetime import datetime
 from datetime import datetime, timedelta
 
 # Import both functions from your calendar plugin
 from plugins.google_calendar import add_to_calendar, fetch_upcoming_events
 
 FILE_PATH = "todos.json"
+tags = []
+due_date_obj = None
+recurrence_obj = None
+task = {}
+priority = 1
+show_completed = False
+
 
 # Load tasks
 def load_todos():
@@ -20,6 +29,7 @@ def load_todos():
                 save_todos(valid_todos)  # save cleaned list
             return valid_todos
     return []
+
 
 # Save tasks to JSON file
 def save_todos(todos):
@@ -59,8 +69,6 @@ def format_recurrence(recurrence):
 def create_task(task_name, due_date, status='pending'):
     conn = sqlite3.connect('tasks.db')
     cursor = conn.cursor()
-    # Note: 'time' module was not imported, assuming this is a work in progress.
-    # For now, we will use datetime.now().timestamp()
     cursor.execute("INSERT INTO tasks (name, due_date, status, timestamp) VALUES (?, ?, ?, ?)",
                    (task_name, due_date, status, datetime.now().timestamp()))
     conn.commit()
@@ -75,6 +83,8 @@ def get_all_tasks():
     return tasks
 
 # Calculate next due date
+
+
 def calculate_next_due(due_date, recurrence):
     due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
     interval = recurrence.get("interval", 1)
@@ -96,11 +106,13 @@ def calculate_next_due(due_date, recurrence):
 
 # Add a new task with combined features
 def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None, auto_sync=True):
-    # Validate non-empty task description (from main)
+    # Validate non-empty task description
     if not task or not task.strip():
         print("Error: Task description cannot be empty.")
         return
         
+
+
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -167,6 +179,33 @@ def adjust_priority_by_due_date(task):
         return task.get("priority", "Medium")
 
 # List tasks (using the more advanced version from 'main')
+
+from datetime import datetime, timedelta
+
+def adjust_priority_by_due_date(task):
+    """
+    Returns auto-adjusted priority if the task has a due date:
+      - Due within 1 day: High
+      - Due within 3 days: Medium
+      - Otherwise: original priority (default: Medium)
+    """
+    due = task.get("due") or task.get("due_date")
+    if not due:
+        return task.get("priority", "Medium")
+    try:
+        due_dt = datetime.strptime(due, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return task.get("priority", "Medium")
+    delta = due_dt - datetime.now()
+    if delta <= timedelta(days=1):
+        return "High"
+    elif delta <= timedelta(days=3):
+        return "Medium"
+    else:
+        return task.get("priority", "Medium")
+
+
+# List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     todos = load_todos()
     if not todos:
@@ -183,11 +222,18 @@ def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
-        tags = ", ".join(task.get("tags", [])) or "None"
-        due = task.get("due_date", "N/A")
-        rec = format_recurrence(task.get("recurrence"))
+        tags = ", ".join(task.get("tags", [])) if task.get("tags") else ""
+        tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
+
+        due_date = task.get("due_date")
+        due_str = f"[Due: {due_date}]" if due_date else "[Due: None]"
+
+        rec_str = f"[Recurrence: {format_recurrence(task.get('recurrence'))}]"
         status = "✅ Done" if task.get("completed") else "⏳ Pending"
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [Recurrence: {rec}] [{status}]")
+
+        print(f"{i}: {task.get('task', '<No task description>')} "
+          f"[Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str} [{status}]")
+
 
 # Search tasks by text or tag (from 'main')
 def search_todos(search_term):
@@ -209,6 +255,22 @@ def search_todos(search_term):
     for i, task in enumerate(matching_tasks):
         tags = ", ".join(task.get("tags", []))
         print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] [Tags: {tags}]")
+
+        # Summary message
+    all_tasks = load_todos()
+    completed = len([t for t in all_tasks if t.get("completed")])
+    pending = len([t for t in all_tasks if not t.get("completed")])
+    high_priority = len([t for t in all_tasks if not t.get("completed") and t.get("priority") == "High"])
+
+    print("\n--- Summary ---")
+    if pending == 0:
+        print("🎉 Nice! All your tasks are completed.")
+    else:
+        print(f"📝 You have {pending} pending task{'s' if pending > 1 else ''}.")
+        if high_priority > 0:
+            print(f"🔥 {high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
+        else:
+            print("👍 No high-priority tasks pending.")
 
 # Remove a task by index
 def remove_todo(index):
@@ -305,6 +367,7 @@ def main():
         print("  python todo.py clear")
         print("  python todo.py sync calendar")
         print("  python todo.py pull calendar")
+        print("  python todo.py list --completed")
         print("  python todo.py <plugin_name> [args...]")
         return
 
@@ -377,7 +440,14 @@ def main():
             pull_tasks_from_calendar()
         else:
             print("Unknown pull command. Did you mean 'pull calendar'?")
-    
+
+    elif command == "complete" and len(sys.argv) == 3:
+        try:
+            index = int(sys.argv[2])
+            complete_todo(index)
+        except ValueError:
+            print("Invalid index. Please provide a number.")
+
     else:
         print(f"Unknown command: {command}")
 

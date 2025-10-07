@@ -464,6 +464,41 @@ from auth import validate
 
 console = Console()
 
+import sys
+import locale
+
+
+def _supports_unicode() -> bool:
+    """Return True if the current stdout encoding can encode a few Unicode symbols we use."""
+    enc = getattr(sys.stdout, "encoding", None) or locale.getpreferredencoding(False) or "utf-8"
+    try:
+        # try a representative symbol
+        "\u25cb".encode(enc)
+        return True
+    except Exception:
+        return False
+
+
+# Choose symbols based on console capability (Windows consoles often use cp1252)
+if _supports_unicode():
+    PENDING_CHAR = "○"
+    COMPLETED_CHAR = "●"
+else:
+    PENDING_CHAR = "[ ]"
+    COMPLETED_CHAR = "[x]"
+
+# Emoji / decorative symbols (used only when console supports them)
+if _supports_unicode():
+    EMOJI_SPARKLE = "✨"
+    EMOJI_CHECK = "✅"
+    EMOJI_FIRE = "🔥"
+    EMOJI_ARM = "💪"
+else:
+    EMOJI_SPARKLE = ""
+    EMOJI_CHECK = ""
+    EMOJI_FIRE = ""
+    EMOJI_ARM = ""
+
 VALID_PRIORITIES = ["Low", "Medium", "High"]
 DEFAULT_PRIORITY = "Medium"
 
@@ -647,14 +682,35 @@ def cmd_list(user: str) -> None:
         console.print("\nPending tasks:", style="bold blue")
         for idx, t in pending:
             pri = t.get("priority", DEFAULT_PRIORITY)
-            console.print(f"  ○ {idx}. [bold cyan]{t['description']}[/bold cyan] [dim]({pri})[/dim]")
+            console.print(f"  {PENDING_CHAR} {idx}. [bold cyan]{t['description']}[/bold cyan] [dim]({pri})[/dim]")
     else:
         console.print("No pending tasks.", style="green")
 
     if completed:
         console.print("\nCompleted tasks:", style="bold green")
         for idx, t in completed:
-            console.print(f"  ● {idx}. [strikethrough dim]{t['description']}[/strikethrough dim]")
+            console.print(f"  {COMPLETED_CHAR} {idx}. [strikethrough dim]{t['description']}[/strikethrough dim]")
+
+    # --- Smart suggestions / friendly summary ---
+    try:
+        pending_count = len(pending)
+        completed_count = len(completed)
+        high_pending = sum(1 for _, t in pending if t.get("priority", DEFAULT_PRIORITY) == "High")
+
+        if pending_count == 0 and completed_count > 0:
+            console.print(f"\n{EMOJI_CHECK} Nice! All your tasks are completed! {EMOJI_SPARKLE}", style="bold green")
+            console.print("Tip: Take a short break or plan your next day.", style="dim")
+        elif pending_count > 0:
+            if high_pending > 0:
+                # Show high-priority alert in a pink/magenta tone for visibility
+                console.print(f"\n{EMOJI_FIRE} You have {high_pending} high-priority pending {'task' if high_pending==1 else 'tasks'} today.", style="bold magenta")
+            if pending_count > high_pending:
+                # Show general pending count in green to encourage progress
+                console.print(f"{EMOJI_ARM} You have {pending_count} pending {'task' if pending_count==1 else 'tasks'}. Keep going!", style="bold green")
+            console.print("Tip: Try tackling a high-priority task first.", style="dim")
+    except Exception:
+        # Never let summary generation break listing
+        pass
 
 def cmd_remove(user: str, task_name: str) -> None:
     tasks = taskload(user)
