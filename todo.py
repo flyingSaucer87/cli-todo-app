@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import time
+import uuid
 
 FILE_PATH = "todos.json"
 OFFLINE_QUEUE = "offline_queue.json"
@@ -16,6 +17,7 @@ from datetime import datetime, timedelta
 from plugins.google_calendar import add_to_calendar, fetch_upcoming_events
 
 FILE_PATH = "todos.json"
+OFFLINE_QUEUE = "offline_queue.json"
 undo_stack = []
 redo_stack = []
 tags = []
@@ -99,6 +101,48 @@ def load_server_tasks():
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
     snapshot()
+
+def load_offline_queue():
+    if os.path.exists(OFFLINE_QUEUE):
+        with open(OFFLINE_QUEUE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_offline_queue(queue):
+    with open(OFFLINE_QUEUE, "w") as f:
+        json.dump(queue, f, indent=2)
+
+
+ # Log offline actions
+def log_offline_action(operation, task_data):
+    queue = load_offline_queue()
+    queue.append({
+        "timestamp": time.time(),
+        "operation": operation,
+        "task_id": task_data.get("id"),
+        "task_data": task_data
+    })
+    save_offline_queue(queue)
+
+def log_task_change(task, change_type, new_data):
+    if "history" not in task:
+        task["history"] = []
+    task["history"].append({
+        "timestamp": time.time(),
+        "change": change_type,
+        "data": new_data
+    })
+
+ # Sync offline actions with server
+def sync_with_server(server_tasks):
+    local_queue = load_offline_queue()
+    for action in local_queue:
+     pass  
+    save_offline_queue([])
+    print("Sync complete.")
+
+def load_server_tasks():
+    return load_todos()
 
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
@@ -201,6 +245,36 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None,
         return
 
     todos = load_todos()
+    new_task = {
+        "id": str(uuid.uuid4()),
+        "task": task,
+        "priority": priority,
+        "tags": tags,
+        "completed": False,
+        "history": [
+            {
+                "timestamp": time.time(),
+                "change": "created",
+                "data": {
+                    "task": task,
+                    "priority": priority,
+                    "tags": tags,
+                    "completed": False
+                }
+            }
+        ]
+    }
+
+    todos.append(new_task)
+    save_todos(todos)
+    log_offline_action("add", new_task)
+    print(f" Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")   
+
+    todos = load_todos()
+    todos.append({"task": task, "priority": priority, "tags": tags, "completed": False})
+    save_todos(todos)
+    log_offline_action("add", todos[-1])
+    print(f"Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
     task_obj = {
         "task": task,
         "priority": priority,
@@ -297,6 +371,11 @@ def list_todos(filter_tag=None, sort_by=None):
     todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
 
     for i, task in enumerate(todos):
+     
+        tags = ", ".join(task.get("tags", []))
+        due = task.get("due", "N/A")
+        status = " Done" if task.get("completed") else "⏳ Pending"
+        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
         tags = ", ".join(task.get("tags", [])) if task.get("tags") else ""
         tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
 
@@ -358,6 +437,7 @@ def remove_todo(index):
         log_offline_action("remove", todos[index])
         removed = todos.pop(index)
         save_todos(todos)
+        print(f"Removed: {removed['task']} [Priority: {removed['priority']}]")
         print(f"Removed: {removed['task']} [Priority: {removed['priority']}]")
         print(f" Removed: {removed['task']} [Priority: {removed['priority']}]")
         
@@ -435,7 +515,6 @@ def edit_todo(index, new_description):
         print(f"   New: {todos[index]}")
     else:
         print("Invalid task index.")
-        
         print(f"🗑️ Removed: {removed['task']}")
     else:
         print("Invalid task index.")
@@ -444,6 +523,23 @@ def edit_todo(index, new_description):
 def clear_todos():
     snapshot()
     save_todos([])
+    print("All tasks have been cleared.")
+
+# Load plugins from plugins/ folder
+def load_plugins():
+    plugins = {}
+    plugin_dir = "plugins"
+    if os.path.isdir(plugin_dir):
+        for filename in os.listdir(plugin_dir):
+            if filename.endswith(".py"):
+                plugin_name = filename[:-3]
+                try:
+                    module = __import__(f"{plugin_dir}.{plugin_name}", fromlist=["run"])
+                    if hasattr(module, "run"):
+                        plugins[plugin_name] = module.run
+                except Exception as e:
+                    print(f"Failed to load plugin {plugin_name}: {e}")
+    return plugins
     print("All tasks cleared.")
 
 # Mark complete
@@ -452,6 +548,7 @@ def complete_todo(index):
     todos = load_todos()
     if 0 <= index < len(todos):
         todos[index]["completed"] = True
+        log_task_change(todos[index], "completed", {"completed": True})
         log_offline_action("complete", todos[index])
         save_todos(todos)
         print(f"Marked as done: {todos[index]['task']}")
@@ -476,6 +573,22 @@ def redo():
     undo_stack.append(json.dumps(load_todos()))
     next_state = redo_stack.pop()
     restore_state(next_state)
+    print("Redo successful.")
+           
+def rollback_task(index):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        history = todos[index].get("history", [])
+        if len(history) < 2:
+            print("No previous version to roll back to.")
+            return
+        last = history[-2]["data"]
+        todos[index].update(last)
+        log_task_change(todos[index], "rolled back", last)
+        save_todos(todos)
+        print(f"Rolled back task: {todos[index]['task']}")
+    else:
+        print("Invalid task index.")        
     print("Redo successful.")       
     print("↪️ Redo successful.")       
 
@@ -556,6 +669,7 @@ def main():
         print("  python todo.py undo")
         print("  python todo.py redo")
         print("  python todo.py sync")
+
         return
 
     command = sys.argv[1]
@@ -645,6 +759,12 @@ def main():
      server_tasks = load_server_tasks()
      sync_with_server(server_tasks)    
 
+    elif command == "rollback" and len(sys.argv) == 3:
+        try:
+           index = int(sys.argv[2])
+           rollback_task(index)
+        except ValueError:
+           print("Invalid index.")
     else:
         print(f"Unknown command: {command}")
 
