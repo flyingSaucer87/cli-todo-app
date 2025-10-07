@@ -1,6 +1,12 @@
 import json
 import os
 import sys
+import time
+
+FILE_PATH = "todos.json"
+OFFLINE_QUEUE = "offline_queue.json"
+undo_stack = []
+redo_stack = []
 import sqlite3
 
 from datetime import datetime
@@ -47,11 +53,58 @@ def snapshot():
 def restore_state(state_json):
     todos = json.loads(state_json)
     save_todos(todos)
+    
+def snapshot():
+    todos = load_todos()
+    undo_stack.append(json.dumps(todos))
+    redo_stack.clear()
+
+def restore_state(state_json):
+    todos = json.loads(state_json)
+    save_todos(todos)
+
+def load_offline_queue():
+    if os.path.exists(OFFLINE_QUEUE):
+        with open(OFFLINE_QUEUE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_offline_queue(queue):
+    with open(OFFLINE_QUEUE, "w") as f:
+        json.dump(queue, f, indent=2)
+
+
+ # Log offline actions
+def log_offline_action(operation, task_data):
+    queue = load_offline_queue()
+    queue.append({
+        "timestamp": time.time(),
+        "operation": operation,
+        "task_id": task_data.get("id"),
+        "task_data": task_data
+    })
+    save_offline_queue(queue)
+
+ # Sync offline actions with server
+def sync_with_server(server_tasks):
+    local_queue = load_offline_queue()
+    for action in local_queue:
+     pass  
+    save_offline_queue([])
+    print("Sync complete.")
+
+def load_server_tasks():
+    return load_todos()
+
+# Add a new task with optional priority and tags
+def add_todo(task, priority="Medium", tags=None):
+    snapshot()
 
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
     snapshot()
 # Parse recurrence formats
+
 def parse_recurrence(recurrence_str):
     if not recurrence_str:
         return None
@@ -171,7 +224,8 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None,
             
     todos.append(task_obj)
     save_todos(todos)
-    
+    log_offline_action("add", todos[-1])
+    print(f"Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
     print(f"✅ Added: {task} [Priority: {priority}]")
 
 # --- Functions from the 'main' branch for advanced listing ---
@@ -217,9 +271,17 @@ def adjust_priority_by_due_date(task):
     else:
         return task.get("priority", "Medium")
 
-
 # List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None, sort_by=None, show_completed=False):
+    tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
+    due_str = f"[Due: {due_date_obj.strftime('%Y-%m-%d')}]" if due_date_obj else ""
+    rec_str = f"[Recurrence: {format_recurrence(recurrence_obj)}]" if recurrence_obj else ""
+
+    print(f" Added: {task} [Priority: {priority}] {tags_str} {due_str} {rec_str}".strip())
+
+# List all tasks sorted by priority and optionally filtered by tag
+def list_todos(filter_tag=None, sort_by=None):
+
     todos = load_todos()
     if not todos:
         print("No tasks yet!")
@@ -267,6 +329,9 @@ def search_todos(search_term):
     print(f"Found {len(matching_tasks)} matching task(s) for '{search_term}':")
     for i, task in enumerate(matching_tasks):
         tags = ", ".join(task.get("tags", []))
+        due = task.get("due", "N/A")
+        status = " Done" if task.get("completed") else "⏳ Pending"
+        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
         print(f"{i}: {task['task']} [Priority: {task.get('priority', 'Medium')}] [Tags: {tags}]")
 
         # Summary message
@@ -277,21 +342,100 @@ def search_todos(search_term):
 
     print("\n--- Summary ---")
     if pending == 0:
-        print("🎉 Nice! All your tasks are completed.")
+        print("Nice! All your tasks are completed.")
     else:
-        print(f"📝 You have {pending} pending task{'s' if pending > 1 else ''}.")
+        print(f"You have {pending} pending task{'s' if pending > 1 else ''}.")
         if high_priority > 0:
-            print(f"🔥 {high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
+            print(f"{high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
         else:
-            print("👍 No high-priority tasks pending.")
+            print(" No high-priority tasks pending.")
 
 # Remove a task by index
 def remove_todo(index):
     snapshot()
     todos = load_todos()
     if 0 <= index < len(todos):
+        log_offline_action("remove", todos[index])
         removed = todos.pop(index)
         save_todos(todos)
+        print(f"Removed: {removed['task']} [Priority: {removed['priority']}]")
+        print(f" Removed: {removed['task']} [Priority: {removed['priority']}]")
+        
+        # Check for tasks due today
+        check_due_tasks(todos)
+
+        # List the remaining tasks
+        for i, task in enumerate(todos):
+            due_date_str = task["due_date"] if task["due_date"] else "No due date"
+            print(f"{i}: {task['task']} (Due: {due_date_str})")
+    else:
+        print("Invalid task index.")
+
+# Check and notify if any tasks are due today
+def check_due_tasks(todos):
+    today = datetime.today().date()  # Get today's date
+    due_today = [task for task in todos if task["due_date"] and task["due_date"] == today]
+    
+    if due_today:
+        print("\n **Reminder**: The following tasks are due today:")
+        for task in due_today:
+            print(f" - {task['task']}")
+            if task['recurrence']:
+                task['next_due'] = calculate_next_due(task['due_date'], task['recurrence'])  # Update next_due
+        save_todos(todos)
+    else:
+        print("\n No tasks are due today.")
+
+# Clear all tasks
+def clear_todos():
+    snapshot()
+    save_todos([])
+    print("All tasks have been cleared.")
+
+# Load plugins from plugins/ folder
+def load_plugins():
+    plugins = {}
+    plugin_dir = "plugins"
+    if os.path.isdir(plugin_dir):
+        for filename in os.listdir(plugin_dir):
+            if filename.endswith(".py"):
+                plugin_name = filename[:-3]
+                try:
+                    module = __import__(f"{plugin_dir}.{plugin_name}", fromlist=["run"])
+                    if hasattr(module, "run"):
+                        plugins[plugin_name] = module.run
+                except Exception as e:
+                    print(f"Failed to load plugin {plugin_name}: {e}")
+    return plugins
+  
+# Function to calculate the next due date for recurring tasks
+def calculate_next_due(due_date, recurrence):
+    due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
+    
+    if recurrence == "daily":
+        return (due_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
+    elif recurrence == "weekly":
+        return (due_date_obj + timedelta(weeks=1)).strftime("%Y-%m-%d")
+    elif recurrence == "monthly":
+        # Simple approach: add a month (could be improved to handle month length)
+        next_month = due_date_obj.replace(month=due_date_obj.month % 12 + 1)
+        return next_month.strftime("%Y-%m-%d")
+    else:
+        return due_date
+    
+# Edit a task by index
+def edit_todo(index, new_description):
+    todos = load_todos()
+    if 0 <= index < len(todos):
+        old_task = todos[index]
+        todos[index]['task'] = new_description
+        save_todos(todos)
+        print(f" Updated task {index}:")
+        print(f"   Old: {old_task}")
+        print(f"   New: {todos[index]}")
+    else:
+        print("Invalid task index.")
+        
         print(f"🗑️ Removed: {removed['task']}")
     else:
         print("Invalid task index.")
@@ -308,8 +452,9 @@ def complete_todo(index):
     todos = load_todos()
     if 0 <= index < len(todos):
         todos[index]["completed"] = True
+        log_offline_action("complete", todos[index])
         save_todos(todos)
-        print(f"✅ Marked as done: {todos[index]['task']}")
+        print(f"Marked as done: {todos[index]['task']}")
     else:
         print("Invalid task index.")
 
@@ -321,6 +466,7 @@ def undo():
     redo_stack.append(current)
     previous = undo_stack.pop()
     restore_state(previous)
+    print("Undo successful.")
     print("↩️ Undo successful.")
 
 def redo():
@@ -330,6 +476,7 @@ def redo():
     undo_stack.append(json.dumps(load_todos()))
     next_state = redo_stack.pop()
     restore_state(next_state)
+    print("Redo successful.")       
     print("↪️ Redo successful.")       
 
 # Command-line interface
@@ -408,6 +555,7 @@ def main():
         print("  python todo.py <plugin_name> [args...]")
         print("  python todo.py undo")
         print("  python todo.py redo")
+        print("  python todo.py sync")
         return
 
     command = sys.argv[1]
@@ -492,6 +640,10 @@ def main():
 
     elif command == "redo":
         redo()       
+
+    elif command == "sync":
+     server_tasks = load_server_tasks()
+     sync_with_server(server_tasks)    
 
     else:
         print(f"Unknown command: {command}")
