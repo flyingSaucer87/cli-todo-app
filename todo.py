@@ -3,6 +3,8 @@ import os
 import sys
 
 FILE_PATH = "todos.json"
+undo_stack = []
+redo_stack = []
 
 # Load tasks from JSON file
 def load_todos():
@@ -16,8 +18,18 @@ def save_todos(todos):
     with open(FILE_PATH, "w") as f:
         json.dump(todos, f, indent=2)
 
+def snapshot():
+    todos = load_todos()
+    undo_stack.append(json.dumps(todos))
+    redo_stack.clear()
+
+def restore_state(state_json):
+    todos = json.loads(state_json)
+    save_todos(todos)
+
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
+    snapshot()
     valid_priorities = ["Low", "Medium", "High"]
     if priority not in valid_priorities:
         print("Invalid priority. Use: Low, Medium, or High.")
@@ -78,6 +90,7 @@ def list_todos(filter_tag=None, sort_by=None, show_completed=False):
 
 # Remove a task by index
 def remove_todo(index):
+    snapshot()
     todos = load_todos()
     if 0 <= index < len(todos):
         removed = todos.pop(index)
@@ -88,6 +101,7 @@ def remove_todo(index):
 
 # Clear all tasks
 def clear_todos():
+    snapshot()
     save_todos([])
     print("All tasks have been cleared.")
 
@@ -108,6 +122,7 @@ def load_plugins():
     return plugins
 
 def complete_todo(index):
+    snapshot()
     todos = load_todos()
     if 0 <= index < len(todos):
         todos[index]["completed"] = True
@@ -115,6 +130,25 @@ def complete_todo(index):
         print(f"✅ Marked as done: {todos[index]['task']}")
     else:
         print("Invalid task index.")
+
+def undo():
+    if not undo_stack:
+        print("Nothing to undo.")
+        return
+    current = json.dumps(load_todos())
+    redo_stack.append(current)
+    previous = undo_stack.pop()
+    restore_state(previous)
+    print("↩️ Undo successful.")
+
+def redo():
+    if not redo_stack:
+        print("Nothing to redo.")
+        return
+    undo_stack.append(json.dumps(load_todos()))
+    next_state = redo_stack.pop()
+    restore_state(next_state)
+    print("↪️ Redo successful.")       
 
 # Command-line interface
 def main():
@@ -127,6 +161,8 @@ def main():
         print("  python todo.py complete <index>")
         print("  python todo.py list --completed")
         print("  python todo.py <plugin_name> [args...]")
+        print("  python todo.py undo")
+        print("  python todo.py redo")
         return
 
     command = sys.argv[1]
@@ -198,6 +234,12 @@ def main():
             complete_todo(index)
         except ValueError:
             print("Invalid index. Please provide a number.")
+
+    elif command == "undo":
+        undo()
+
+    elif command == "redo":
+        redo()       
 
     else:
         print("Unknown command.")
