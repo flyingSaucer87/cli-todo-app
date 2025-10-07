@@ -1,8 +1,10 @@
 import json
 import os
 import sys
+import time
 
 FILE_PATH = "todos.json"
+OFFLINE_QUEUE = "offline_queue.json"
 undo_stack = []
 redo_stack = []
 
@@ -27,6 +29,39 @@ def restore_state(state_json):
     todos = json.loads(state_json)
     save_todos(todos)
 
+def load_offline_queue():
+    if os.path.exists(OFFLINE_QUEUE):
+        with open(OFFLINE_QUEUE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_offline_queue(queue):
+    with open(OFFLINE_QUEUE, "w") as f:
+        json.dump(queue, f, indent=2)
+
+
+ # Log offline actions
+def log_offline_action(operation, task_data):
+    queue = load_offline_queue()
+    queue.append({
+        "timestamp": time.time(),
+        "operation": operation,
+        "task_id": task_data.get("id"),
+        "task_data": task_data
+    })
+    save_offline_queue(queue)
+
+ # Sync offline actions with server
+def sync_with_server(server_tasks):
+    local_queue = load_offline_queue()
+    for action in local_queue:
+     pass  
+    save_offline_queue([])
+    print("Sync complete.")
+
+def load_server_tasks():
+    return load_todos()
+
 # Add a new task with optional priority and tags
 def add_todo(task, priority="Medium", tags=None):
     snapshot()
@@ -41,7 +76,8 @@ def add_todo(task, priority="Medium", tags=None):
     todos = load_todos()
     todos.append({"task": task, "priority": priority, "tags": tags, "completed": False})
     save_todos(todos)
-    print(f"✅ Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
+    log_offline_action("add", todos[-1])
+    print(f"Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
 
 # List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None, sort_by=None, show_completed=False):
@@ -69,7 +105,7 @@ def list_todos(filter_tag=None, sort_by=None, show_completed=False):
     for i, task in enumerate(todos):
         tags = ", ".join(task.get("tags", []))
         due = task.get("due", "N/A")
-        status = "✅ Done" if task.get("completed") else "⏳ Pending"
+        status = " Done" if task.get("completed") else "⏳ Pending"
         print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
 
         # Summary message
@@ -80,22 +116,23 @@ def list_todos(filter_tag=None, sort_by=None, show_completed=False):
 
     print("\n--- Summary ---")
     if pending == 0:
-        print("🎉 Nice! All your tasks are completed.")
+        print("Nice! All your tasks are completed.")
     else:
-        print(f"📝 You have {pending} pending task{'s' if pending > 1 else ''}.")
+        print(f"You have {pending} pending task{'s' if pending > 1 else ''}.")
         if high_priority > 0:
-            print(f"🔥 {high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
+            print(f"{high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
         else:
-            print("👍 No high-priority tasks pending.")
+            print(" No high-priority tasks pending.")
 
 # Remove a task by index
 def remove_todo(index):
     snapshot()
     todos = load_todos()
     if 0 <= index < len(todos):
+        log_offline_action("remove", todos[index])
         removed = todos.pop(index)
         save_todos(todos)
-        print(f"🗑️ Removed: {removed['task']} [Priority: {removed['priority']}]")
+        print(f"Removed: {removed['task']} [Priority: {removed['priority']}]")
     else:
         print("Invalid task index.")
 
@@ -118,7 +155,7 @@ def load_plugins():
                     if hasattr(module, "run"):
                         plugins[plugin_name] = module.run
                 except Exception as e:
-                    print(f"⚠️ Failed to load plugin {plugin_name}: {e}")
+                    print(f"Failed to load plugin {plugin_name}: {e}")
     return plugins
 
 def complete_todo(index):
@@ -126,8 +163,9 @@ def complete_todo(index):
     todos = load_todos()
     if 0 <= index < len(todos):
         todos[index]["completed"] = True
+        log_offline_action("complete", todos[index])
         save_todos(todos)
-        print(f"✅ Marked as done: {todos[index]['task']}")
+        print(f"Marked as done: {todos[index]['task']}")
     else:
         print("Invalid task index.")
 
@@ -139,7 +177,7 @@ def undo():
     redo_stack.append(current)
     previous = undo_stack.pop()
     restore_state(previous)
-    print("↩️ Undo successful.")
+    print("Undo successful.")
 
 def redo():
     if not redo_stack:
@@ -148,7 +186,7 @@ def redo():
     undo_stack.append(json.dumps(load_todos()))
     next_state = redo_stack.pop()
     restore_state(next_state)
-    print("↪️ Redo successful.")       
+    print("Redo successful.")       
 
 # Command-line interface
 def main():
@@ -163,6 +201,8 @@ def main():
         print("  python todo.py <plugin_name> [args...]")
         print("  python todo.py undo")
         print("  python todo.py redo")
+        print("  python todo.py sync")
+
         return
 
     command = sys.argv[1]
@@ -240,6 +280,10 @@ def main():
 
     elif command == "redo":
         redo()       
+
+    elif command == "sync":
+     server_tasks = load_server_tasks()
+     sync_with_server(server_tasks)    
 
     else:
         print("Unknown command.")
