@@ -243,14 +243,19 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None,
     if recurrence and not recurrence_obj:
         print("Invalid recurrence format. Use daily, weekly, monthly, or 3d/2w/1m.")
         return
-
+    current_user = get_current_user()
     todos = load_todos()
     new_task = {
         "id": str(uuid.uuid4()),
         "task": task,
         "priority": priority,
         "tags": tags,
+        "due_date": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
+        "recurrence": recurrence_obj,
+        "next_due": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
         "completed": False,
+        "synced": False,
+        "shared_with": [current_user],
         "history": [
             {
                 "timestamp": time.time(),
@@ -264,41 +269,20 @@ def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None,
             }
         ]
     }
-
-    todos.append(new_task)
-    save_todos(todos)
-    log_offline_action("add", new_task)
-    print(f" Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")   
-
-    todos = load_todos()
-    todos.append({"task": task, "priority": priority, "tags": tags, "completed": False})
-    save_todos(todos)
-    log_offline_action("add", todos[-1])
-    print(f"Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
-    task_obj = {
-        "task": task,
-        "priority": priority,
-        "tags": tags,
-        "due_date": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
-        "recurrence": recurrence_obj,
-        "next_due": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
-        "completed": False,
-        "synced": False  # Initialize as not synced (from your branch)
-    }
     
     # Google Calendar Sync (from your branch)
     if due_date_obj and auto_sync:
         print(f"Syncing '{task}' to Google Calendar...")
         try:
             add_to_calendar(task, due_date_obj)
-            task_obj['synced'] = True  # Mark as synced
+            new_task['synced'] = True  # Mark as synced
             print("📅 Task synced to Google Calendar successfully!")
         except Exception as e:
             print(f"❌ Failed to sync with Google Calendar: {e}")
             
-    todos.append(task_obj)
+    todos.append(new_task)
     save_todos(todos)
-    log_offline_action("add", todos[-1])
+    log_offline_action("add", new_task)
     print(f"Added: {task} [Priority: {priority}] [Tags: {', '.join(tags)}]")
     print(f"✅ Added: {task} [Priority: {priority}]")
 
@@ -346,17 +330,10 @@ def adjust_priority_by_due_date(task):
         return task.get("priority", "Medium")
 
 # List all tasks sorted by priority and optionally filtered by tag
-def list_todos(filter_tag=None, sort_by=None, show_completed=False):
-    tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
-    due_str = f"[Due: {due_date_obj.strftime('%Y-%m-%d')}]" if due_date_obj else ""
-    rec_str = f"[Recurrence: {format_recurrence(recurrence_obj)}]" if recurrence_obj else ""
-
-    print(f" Added: {task} [Priority: {priority}] {tags_str} {due_str} {rec_str}".strip())
-
-# List all tasks sorted by priority and optionally filtered by tag
 def list_todos(filter_tag=None, sort_by=None):
-
-    todos = load_todos()
+    current_user = get_current_user()
+    all_todos = load_todos()
+    todos = [t for t in all_todos if can_access_task(t, current_user)]
     if not todos:
         print("No tasks yet!")
         return
@@ -391,7 +368,9 @@ def list_todos(filter_tag=None, sort_by=None):
           f"[Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str} [{status}]")
 
 def search_todos(search_term):
+    current_user = get_current_user()
     todos = load_todos()
+    todos = [t for t in todos if can_access_task(t, current_user)]
     if not todos:
         print("No tasks found!")
         return
@@ -432,7 +411,9 @@ def search_todos(search_term):
 # Remove a task by index
 def remove_todo(index):
     snapshot()
+    current_user = get_current_user
     todos = load_todos()
+    todos = [t for t in todos if can_access_task(t, current_user)]
     if 0 <= index < len(todos):
         log_offline_action("remove", todos[index])
         removed = todos.pop(index)
@@ -469,7 +450,10 @@ def check_due_tasks(todos):
 # Clear all tasks
 def clear_todos():
     snapshot()
-    save_todos([])
+    current_user = get_current_user()
+    todos = load_todos()
+    other_user_tasks = [t for t in todos if not can_access_task(t, current_user)]
+    save_todos(other_user_tasks)
     print("All tasks have been cleared.")
 
 # Load plugins from plugins/ folder
@@ -505,7 +489,9 @@ def calculate_next_due(due_date, recurrence):
     
 # Edit a task by index
 def edit_todo(index, new_description):
+    current_user = get_current_user()
     todos = load_todos()
+    todos = [t for t in todos if can_access_task(t, current_user)]
     if 0 <= index < len(todos):
         old_task = todos[index]
         todos[index]['task'] = new_description
@@ -513,9 +499,6 @@ def edit_todo(index, new_description):
         print(f" Updated task {index}:")
         print(f"   Old: {old_task}")
         print(f"   New: {todos[index]}")
-    else:
-        print("Invalid task index.")
-        print(f"🗑️ Removed: {removed['task']}")
     else:
         print("Invalid task index.")
 
@@ -651,7 +634,64 @@ def pull_tasks_from_calendar():
         print("No new tasks to import.")
     else:
         print(f"Import complete. Added {new_tasks_added} new tasks.")
+def get_current_user():
+    print("Input your username:")
+    return input().strip()
 
+def can_access_task(task, user):
+    shared_with = task.get("shared_with", [])
+    if not shared_with:
+        return True
+    return user in shared_with
+
+def share_task(task_index, collaborators):
+    current_user = get_current_user()
+    todos = load_todos()
+    
+    if 0 <= task_index < len(todos):
+        task = todos[task_index]
+        
+        if not can_access_task(task, current_user):
+            print("You don't have permission to share this task.")
+            return
+        if "shared_with" not in task:
+            task["shared_with"] = [current_user]
+        
+        for collaborator in collaborators:
+            if collaborator not in task["shared_with"]:
+                task["shared_with"].append(collaborator)
+        
+        log_task_change(task, "shared", {"shared_with": task["shared_with"]})
+        save_todos(todos)
+        
+        collab_str = ', '.join(collaborators)
+        print(f"Task '{task['task']}' shared with: {collab_str}")
+    else:
+        print("Invalid task index.")
+
+def list_shared_tasks():
+    current_user = get_current_user()
+    todos = load_todos()
+    
+    shared_tasks = []
+    for i, task in enumerate(todos):
+        if can_access_task(task, current_user) and len(task.get("shared_with", [])) > 1:
+            shared_tasks.append((i, task))
+    
+    if not shared_tasks:
+        print("No shared tasks found.")
+        return
+    
+    print("Shared Tasks:")
+    for i, task in shared_tasks:
+        shared_with = task.get("shared_with", [])
+        other_users = [u for u in shared_with if u != current_user]
+        status = "Done" if task.get("completed") else "Pending"
+        print(f"{i}: {task['task']} [{status}]")
+        print(f"    Priority: {task.get('priority', 'Medium')}")
+        print(f"    Shared with: {', '.join(other_users)}")
+        print(f"    Tags: {', '.join(task.get('tags', []))}")
+        print("-" * 30)
 # CLI
 def main():
     if len(sys.argv) < 2:
@@ -669,6 +709,8 @@ def main():
         print("  python todo.py undo")
         print("  python todo.py redo")
         print("  python todo.py sync")
+        print("  python todo.py share <user1> <user2>...")
+        print("  python todo.py list_shared")
 
         return
 
@@ -765,6 +807,18 @@ def main():
            rollback_task(index)
         except ValueError:
            print("Invalid index.")
+    elif command == "share" and len(sys.argv) >= 4:
+        try:
+            task_index = int(sys.argv[2])
+            collaborators = sys.argv[3:]
+
+            share_task(task_index, collaborators)
+        except ValueError:
+            print("Invalid task index.")
+        except Exception as e:
+            print(f"Error: {e}")
+    elif command == "list_shared":
+        list_shared_tasks()
     else:
         print(f"Unknown command: {command}")
 

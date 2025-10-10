@@ -1,374 +1,43 @@
 [
   {
-    "description": "Fix critical security vulnerability",
-    "completed": true,
+    "id": "88df85b1-5891-4da0-a119-1f5e0a133030",
+    "task": "work",
     "priority": "High",
     "tags": [
-      "security",
-      "urgent",
-      "backend"
-    ]
-  },
-  {
-    "description": "Server is down - immediate fix needed",
-    "completed": true,
-    "priority": "High",
-    "tags": [
-      "infrastructure",
-      "urgent"
-    ]
-  },
-  {
-    "description": "Memory leak in production",
-    "completed": false,
-    "priority": "High",
-    "tags": [
-      "performance",
-      "urgent",
-      "debugging"
-    ]
-  },
-  {
-    "description": "Database corruption detected",
-    "completed": true,
-    "priority": "High",
-    "tags": [
-      "database",
-      "critical",
-      "urgent"
-    ]
-  },
-  {
-    "description": "Old task 1",
-    "completed": false,
-    "priority": "Medium",
-    "tags": []
-  },
-  {
-    "description": "Old task 2",
-    "completed": true,
-    "priority": "Medium",
-    "tags": []
-  },
-  {
-    "description": "Legacy string task",
-    "completed": false,
-    "priority": "Medium",
-    "tags": []
-  },
-  {
-    "description": "Basic task with no flags",
-    "completed": true,
-    "priority": "Medium",
-    "tags": []
-  },
-  {
-    "description": "Implement user authentication",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "feature",
-      "backend",
-      "auth"
-    ]
-  },
-  {
-    "description": "Write unit tests for API",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "testing",
-      "backend",
-      "qa"
-    ]
-  },
-  {
-    "description": "Update documentation",
-    "completed": true,
-    "priority": "Medium",
-    "tags": [
-      "docs",
-      "maintenance"
-    ]
-  },
-  {
-    "description": "Code review for PR #123",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "review",
-      "collaboration"
-    ]
-  },
-  {
-    "description": "Refactor legacy code",
-    "completed": true,
-    "priority": "Medium",
-    "tags": [
-      "refactor",
-      "technical-debt"
-    ]
-  },
-  {
-    "description": "Deploy new feature to staging",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "deployment",
-      "staging",
-      "devops",
-      "testing"
-    ]
-  },
-  {
-    "description": "Team meeting preparation",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "meeting",
-      "planning",
-      "team",
-      "collaboration"
-    ]
-  },
-  {
-    "description": "Backup important files",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "backup"
-    ]
-  },
-  {
-    "description": "Task with special characters @#$%^&*()",
-    "completed": false,
-    "priority": "Medium",
-    "tags": [
-      "special",
-      "test"
-    ]
-  },
-  {
-    "description": "Buy groceries for the week",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "personal",
-      "shopping",
-      "weekend"
-    ]
-  },
-  {
-    "description": "Clean up development environment",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "maintenance",
-      "dev-tools"
-    ]
-  },
-  {
-    "description": "Organize digital photos",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "personal",
-      "organization"
-    ]
-  },
-  {
-    "description": "Learn new JavaScript framework",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "learning",
-      "javascript",
-      "skill-development"
-    ]
-  },
-  {
-    "description": "Update resume",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "personal",
-      "career"
-    ]
-  },
-  {
-    "description": "Performance optimization research",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "research",
-      "performance",
-      "optimization",
-      "learning"
-    ]
-  },
-  {
-    "description": "Exercise - go for a run",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "exercise"
-    ]
-  },
-  {
-    "description": "Call mom",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "family"
-    ]
-  },
-  {
-    "description": "Very long task description that goes on and on and should still work properly even with lots of text",
-    "completed": false,
-    "priority": "Low",
-    "tags": [
-      "verbose",
-      "test"
-    ]
-  },
-  {
-    "task": "To die",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "To die",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": null,
+      "work"
+    ],
+    "due_date": "2025-09-08",
     "recurrence": null,
-    "next_due": null
-  },
-  {
-    "task": "Finish assignment",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Finish assignment",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-09",
-    "recurrence": null,
-    "next_due": "2025-10-09"
-  },
-  {
-    "task": "Due soon!",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Due soon!",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-07",
-    "recurrence": null,
-    "next_due": "2025-10-07"
-  },
-  {
-    "task": "Due in 3 days",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Due in 3 days",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-09",
-    "recurrence": null,
-    "next_due": "2025-10-09"
-  },
-  {
-    "task": "Far away",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Far away",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-15",
-    "recurrence": null,
-    "next_due": "2025-10-15"
-  },
-  {
-    "task": "To die",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "To die",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": null,
-    "recurrence": null,
-    "next_due": null
-  },
-  {
-    "task": "Finish assignment",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Finish assignment",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-09",
-    "recurrence": null,
-    "next_due": "2025-10-09"
-  },
-  {
-    "task": "Due soon!",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Due soon!",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-07",
-    "recurrence": null,
-    "next_due": "2025-10-07"
-  },
-  {
-    "task": "Due in 3 days",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Due in 3 days",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-09",
-    "recurrence": null,
-    "next_due": "2025-10-09"
-  },
-  {
-    "task": "Far away",
-    "priority": "Medium",
-    "tags": [],
-    "completed": false
-  },
-  {
-    "task": "Far away",
-    "priority": "Medium",
-    "tags": [],
-    "due_date": "2025-10-15",
-    "recurrence": null,
-    "next_due": "2025-10-15"
+    "next_due": "2025-09-08",
+    "completed": false,
+    "synced": false,
+    "shared_with": [
+      "eleena",
+      "emley"
+    ],
+    "history": [
+      {
+        "timestamp": 1760033212.8365757,
+        "change": "created",
+        "data": {
+          "task": "work",
+          "priority": "High",
+          "tags": [
+            "work"
+          ],
+          "completed": false
+        }
+      },
+      {
+        "timestamp": 1760033302.6758795,
+        "change": "shared",
+        "data": {
+          "shared_with": [
+            "eleena",
+            "emley"
+          ]
+        }
+      }
+    ]
   }
 ]

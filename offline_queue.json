@@ -1,0 +1,37 @@
+[
+  {
+    "timestamp": 1760033212.8371372,
+    "operation": "add",
+    "task_id": "88df85b1-5891-4da0-a119-1f5e0a133030",
+    "task_data": {
+      "id": "88df85b1-5891-4da0-a119-1f5e0a133030",
+      "task": "work",
+      "priority": "High",
+      "tags": [
+        "work"
+      ],
+      "due_date": "2025-09-08",
+      "recurrence": null,
+      "next_due": "2025-09-08",
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        "eleena"
+      ],
+      "history": [
+        {
+          "timestamp": 1760033212.8365757,
+          "change": "created",
+          "data": {
+            "task": "work",
+            "priority": "High",
+            "tags": [
+              "work"
+            ],
+            "completed": false
+          }
+        }
+      ]
+    }
+  }
+]
