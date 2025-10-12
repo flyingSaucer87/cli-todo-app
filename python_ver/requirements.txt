@@ -2,3 +2,7 @@ rich>=13.0.0
 SpeechRecognition>=3.10.0
 argon2-cffi>=21.3.0
 pyaudio>=0.2.11
+google-api-python-client>=2.70.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.0.0
+pytest>=7.0.0

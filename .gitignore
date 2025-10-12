@@ -1,3 +1,50 @@
-todos.json
 node_modules/
+
+# Task data files
+tasks.json
+todos.json
+offline_queue.json
+
+# Authentication files
+auth.json
+last_login.json
+
+# Database files
+*.db
+*.sqlite
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+venv/
+env/
+
+# IDE files
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# Google Calendar credentials
+token.json
+credentials.json
