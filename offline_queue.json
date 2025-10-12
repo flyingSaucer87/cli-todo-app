@@ -33,5 +33,160 @@
         }
       ]
     }
+  },
+  {
+    "timestamp": 1760279894.9033644,
+    "operation": "add",
+    "task_id": "e6c7edc1-318b-48fd-a78f-270f7725f863",
+    "task_data": {
+      "id": "e6c7edc1-318b-48fd-a78f-270f7725f863",
+      "task": "Write the first chapter of my book",
+      "priority": "Medium",
+      "tags": [],
+      "due_date": null,
+      "recurrence": null,
+      "next_due": null,
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        ""
+      ],
+      "history": [
+        {
+          "timestamp": 1760279894.9016333,
+          "change": "created",
+          "data": {
+            "task": "Write the first chapter of my book",
+            "priority": "Medium",
+            "tags": [],
+            "completed": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": 1760279914.6110096,
+    "operation": "add",
+    "task_id": "041205e5-0c82-4189-96b6-9411c966ab1a",
+    "task_data": {
+      "id": "041205e5-0c82-4189-96b6-9411c966ab1a",
+      "task": "Review the project proposal",
+      "priority": "Medium",
+      "tags": [],
+      "due_date": null,
+      "recurrence": null,
+      "next_due": null,
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        ""
+      ],
+      "history": [
+        {
+          "timestamp": 1760279914.6091,
+          "change": "created",
+          "data": {
+            "task": "Review the project proposal",
+            "priority": "Medium",
+            "tags": [],
+            "completed": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": 1760280427.6388397,
+    "operation": "add",
+    "task_id": "2670b102-d56a-49cf-b5ed-e8618e5eb6df",
+    "task_data": {
+      "id": "2670b102-d56a-49cf-b5ed-e8618e5eb6df",
+      "task": "Write the first chapter of my book",
+      "priority": "Medium",
+      "tags": [],
+      "due_date": null,
+      "recurrence": null,
+      "next_due": null,
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        ""
+      ],
+      "history": [
+        {
+          "timestamp": 1760280427.6367586,
+          "change": "created",
+          "data": {
+            "task": "Write the first chapter of my book",
+            "priority": "Medium",
+            "tags": [],
+            "completed": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": 1760280436.9474797,
+    "operation": "add",
+    "task_id": "9b010118-f446-400c-aa69-6eb18ffcac43",
+    "task_data": {
+      "id": "9b010118-f446-400c-aa69-6eb18ffcac43",
+      "task": "Review the project proposal",
+      "priority": "Medium",
+      "tags": [],
+      "due_date": null,
+      "recurrence": null,
+      "next_due": null,
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        ""
+      ],
+      "history": [
+        {
+          "timestamp": 1760280436.9456062,
+          "change": "created",
+          "data": {
+            "task": "Review the project proposal",
+            "priority": "Medium",
+            "tags": [],
+            "completed": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": 1760280442.4494464,
+    "operation": "add",
+    "task_id": "415ba601-ea57-4461-a2bb-a16faca7a9f0",
+    "task_data": {
+      "id": "415ba601-ea57-4461-a2bb-a16faca7a9f0",
+      "task": "Water the plants",
+      "priority": "Medium",
+      "tags": [],
+      "due_date": null,
+      "recurrence": null,
+      "next_due": null,
+      "completed": false,
+      "synced": false,
+      "shared_with": [
+        ""
+      ],
+      "history": [
+        {
+          "timestamp": 1760280442.4470768,
+          "change": "created",
+          "data": {
+            "task": "Water the plants",
+            "priority": "Medium",
+            "tags": [],
+            "completed": false
+          }
+        }
+      ]
+    }
   }
 ]
