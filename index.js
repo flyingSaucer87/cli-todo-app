@@ -1,147 +1,192 @@
-import { addTodo, listTodos, removeTodo, editTodo, completeTodo, clearTodos } from "./todo.js";
-import * as exporter from "./exporter.js";
-import process from "process";
-import chalk from "chalk";
-import { themes } from "./themes.js";
-import fs from "fs";
+import { addTodo, listTodos, editTodo, removeTodo, toggleTodo, clearTodos } from './todo.js';
 
-// Load config file if exists
-let configTheme = "dark";
-try {
-  if (fs.existsSync("config.json")) {
-    const configData = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-    if (configData.theme && themes[configData.theme]) {
-      configTheme = configData.theme;
-    }
-  }
-} catch (err) {
-  console.error("Failed to read config file:", err);
-}
-
-// CLI argument override: e.g. node index.js --theme neon
 const args = process.argv.slice(2);
-const themeArgIndex = args.indexOf("--theme");
-if (themeArgIndex !== -1 && args[themeArgIndex + 1]) {
-  const argTheme = args[themeArgIndex + 1];
-  if (themes[argTheme]) configTheme = argTheme;
-}
-
-const theme = themes[configTheme];
-const color = (text) => chalk.hex(theme.primary)(text);
-const accent = (text) => chalk.hex(theme.accent)(text);
 const command = args[0];
 
-if (command === "help" || args.length === 0) {
+function parseFlags(args) {
+  const flags = {};
+  const positional = [];
+  
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+      const flag = args[i].substring(2);
+      
+      // Check if next arg exists and is not a flag
+      if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
+        flags[flag] = args[i + 1];
+        i++; // Skip next arg since we consumed it
+      } else {
+        flags[flag] = true;
+      }
+    } else {
+      positional.push(args[i]);
+    }
+  }
+  
+  return { flags, positional };
+}
+
+function parseTags(tagString) {
+  // Handle cases where tagString might be boolean true or other non-string
+  if (tagString === true || tagString === undefined || tagString === null) {
+    return [];
+  }
+  
+  // Convert to string if needed
+  const str = String(tagString);
+  
+  if (str.trim() === '') {
+    return [];
+  }
+  
+  return str.split(',').map(t => t.trim()).filter(t => t.length > 0);
+}
+
+function showHelp() {
   console.log(`
-Usage:
-  node index.js add "Task description" [--priority High|Medium|Low] [--tags tag1,tag2]
-  node index.js list [--completed] [--pending] [--tag tagname]
-  node index.js complete <index> - Mark task as completed
-  node index.js remove <index> - Remove task by index
-  node index.js edit <index> [--description "New desc"] [--priority High|Medium|Low] [--tags tag1,tag2]
-  node index.js clear - Remove all tasks
+Usage: node index.js <command> [arguments] [flags]
+
+Commands:
+  add <task>           Add a new task
+  list                 List all tasks with progress bar
+  edit <index>         Edit a task at the given index
+  remove <index>       Remove a task at the given index
+  complete <index>     Toggle task completion status
+  clear                Clear all tasks
+  help                 Show this help message
+
+Flags for 'add':
+  --priority <level>   Set priority (High, Medium, Low)
+  --tags <tags>        Comma-separated tags
+
+Flags for 'list':
+  --completed          Show only completed tasks
+  --pending            Show only pending tasks
+  --tag <tag>          Filter by tag
+
+Flags for 'edit':
+  --description <text> Update task description
+  --priority <level>   Update priority
+  --tags <tags>        Update tags (comma-separated, or empty string to clear)
 
 Examples:
   node index.js add "Buy groceries" --priority High --tags shopping,urgent
-  node index.js list --pending
-  node index.js list --tag work
+  node index.js list --pending --tag urgent
   node index.js complete 0
-`);
+  node index.js edit 0 --description "New description" --priority Low
+  node index.js edit 1 --tags dev,testing
+  node index.js remove 0
+  node index.js clear
+  `);
+}
+
+if (command === "help" || args.length === 0 || command === undefined) {
+  showHelp();
   process.exit(0);
 }
 
-function parseArgs(args) {
-  const parsed = { positional: [], flags: {} };
-  let i = 0;
-  while (i < args.length) {
-    if (args[i].startsWith("--")) {
-      const flag = args[i].substring(2);
-      if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-        parsed.flags[flag] = args[i + 1];
-        i += 2;
-      } else {
-        parsed.flags[flag] = true;
-        i++;
-      }
-    } else {
-      parsed.positional.push(args[i]);
-      i++;
-    }
-  }
-  return parsed;
-}
-
-const parsed = parseArgs(args.slice(1));
+const { flags, positional } = parseFlags(args.slice(1));
 
 switch (command) {
-  case "add":
-    const description = parsed.positional[0];
-    if (!description || !description.trim()) {
-      console.log("Error: Please provide a task description.");
+  case "add": {
+    if (positional.length === 0) {
+      console.error('Error: Please provide a task description');
+      console.log('Usage: node index.js add "Your task" [--priority <level>] [--tags <tags>]');
       process.exit(1);
     }
-    const priority = parsed.flags.priority || "Medium";
-    const tags = parsed.flags.tags ? parsed.flags.tags.split(",").map(t => t.trim()) : [];
+    
+    const description = positional.join(' ');
+    const priority = flags.priority || 'Medium';
+    const tags = flags.tags ? parseTags(flags.tags) : [];
+    
     addTodo(description, priority, tags);
-    console.log(`✓ Added: ${description} (Priority: ${priority}, Tags: [${tags.join(", ")}])`);
     break;
+  }
 
-  case "list":
-    let filterCompleted = null;
-    if (parsed.flags.completed) filterCompleted = true;
-    if (parsed.flags.pending) filterCompleted = false;
-    listTodos(filterCompleted, parsed.flags.tag);
+  case "list": {
+    const filters = {};
+    
+    if (flags.completed) {
+      filters.completed = true;
+    } else if (flags.pending) {
+      filters.completed = false;
+    }
+    
+    if (flags.tag) {
+      filters.tag = flags.tag;
+    }
+    
+    listTodos(filters);
     break;
+  }
 
-  case "complete":
-    const completeIndex = parseInt(parsed.positional[0], 10);
-    if (isNaN(completeIndex)) {
-      console.log("Error: Please provide a valid task index.");
+  case "complete": {
+    if (positional.length === 0) {
+      console.error('Error: Please provide an index');
+      console.log('Usage: node index.js complete <index>');
       process.exit(1);
     }
-    completeTodo(completeIndex);
-    break;
-
-  case "remove":
-    const removeIndex = parseInt(parsed.positional[0], 10);
-    if (isNaN(removeIndex)) {
-      console.log("Error: Please provide a valid task index.");
+    
+    const index = parseInt(positional[0], 10);
+    if (isNaN(index)) {
+      console.error('Error: Please provide a valid task index.');
       process.exit(1);
     }
-    removeTodo(removeIndex);
+    
+    toggleTodo(index);
     break;
+  }
 
-  case "edit":
-    const editIndex = parseInt(parsed.positional[0], 10);
-    if (isNaN(editIndex)) {
-      console.log("Error: Please provide a valid task index.");
+  case "remove": {
+    if (positional.length === 0) {
+      console.error('Error: Please provide an index');
+      console.log('Usage: node index.js remove <index>');
       process.exit(1);
     }
-    const newTags = parsed.flags.tags ? parsed.flags.tags.split(",").map(t => t.trim()) : undefined;
-    editTodo(editIndex, parsed.flags.description, parsed.flags.priority, newTags);
+    
+    const index = parseInt(positional[0], 10);
+    if (isNaN(index)) {
+      console.error('Error: Please provide a valid task index.');
+      process.exit(1);
+    }
+    
+    removeTodo(index);
     break;
+  }
 
-  case "clear":
+  case "edit": {
+    if (positional.length === 0) {
+      console.error('Error: Please provide an index');
+      console.log('Usage: node index.js edit <index> [--description <text>] [--priority <level>] [--tags <tags>]');
+      process.exit(1);
+    }
+    
+    const index = parseInt(positional[0], 10);
+    if (isNaN(index)) {
+      console.error('Error: Please provide a valid task index.');
+      process.exit(1);
+    }
+    
+    const newDescription = flags.description;
+    const newPriority = flags.priority;
+    const newTags = flags.tags !== undefined ? parseTags(flags.tags) : undefined;
+    
+    if (newDescription === undefined && newPriority === undefined && newTags === undefined) {
+      console.error('Error: Please provide at least one flag to edit (--description, --priority, or --tags)');
+      process.exit(1);
+    }
+    
+    editTodo(index, newDescription, newPriority, newTags);
+    break;
+  }
+
+  case "clear": {
     clearTodos();
-    console.log("All tasks have been cleared.");
     break;
-
-  case "export":
-    const format = process.argv[3] || "csv";
-    const out = process.argv[4] || `todos.${format}`;
-    exporter.exportTodos(format, out);
-    process.exit(0);
-
-  case "import":
-    const inFormat = process.argv[3] || "csv";
-    const infile = process.argv[4];
-    if (!infile) {
-      console.error("Usage: node index.js import <csv|md> <file>");
-      process.exit(1);
-    }
-    exporter.importTodos(inFormat, infile);
-    process.exit(0);
+  }
 
   default:
-    console.log("Unknown command. Use 'help' for usage information.");
+    console.error(`Unknown command: ${command}`);
+    showHelp();
+    process.exit(1);
 }

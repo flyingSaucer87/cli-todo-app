@@ -1,716 +1,1047 @@
+# #!/usr/bin/env python3
+# from __future__ import annotations
+# import argparse
+# import json
+# import os
+# import sys
+# import tempfile
+# from pathlib import Path
+# from typing import List, Dict, Any
+# from typing import List, Dict, Any
+# from collections import Counter
+# from rich.console import Console
+# from rich.table import Table
+# from rich.progress import Progress
+# from auth import validate
+
+# console = Console()
+
+# def show_stats():
+#     tasks = taskload()
+#     if not tasks:
+#         print("No tasks to analyze.")
+#         return
+
+#     # Completion Rate
+#     completed = sum(1 for task in tasks if task.get("completed", False))
+#     total = len(tasks)
+#     completion_percent = (completed / total) * 100 if total else 0
+
+#     # Priority Breakdown
+#     priority_counts = Counter(task.get("priority", "Medium") for task in tasks)
+
+#     # Tags Breakdown
+#     tag_counts = Counter(tag for task in tasks for tag in task.get("tags", []))
+
+#     # Display
+#     console.rule("[bold green]📊 Task Analytics Dashboard")
+#     console.print(f"\n✅ [bold]Completion:[/bold] {completed}/{total} tasks completed ({completion_percent:.2f}%)")
+
+#     # Priority Table
+#     table = Table(title="Priority Breakdown")
+#     table.add_column("Priority", justify="left", style="cyan")
+#     table.add_column("Count", justify="right", style="magenta")
+#     for priority, count in priority_counts.items():
+#         table.add_row(priority, str(count))
+#     console.print(table)
+
+#     # Tag Table
+#     if tag_counts:
+#         tag_table = Table(title="Most Used Tags")
+#         tag_table.add_column("Tag", style="green")
+#         tag_table.add_column("Count", justify="right", style="yellow")
+#         for tag, count in tag_counts.most_common(10):
+#             tag_table.add_row(tag, str(count))
+#         console.print(tag_table)
+#     else:
+#         console.print("🔖 No tags found.")
+
+#     console.rule()
+
+
+# def cmd_add(description: str, priority: str = "Medium", tags: List[str] = [], completed: bool = False) -> None:
+
+#     # Validate task is not empty
+#     if not validate_task(description):
+#         print("Error: Task description cannot be empty or whitespace only.", file=sys.stderr)
+#         sys.exit(1)
+
+#     # Validate priority
+#     if priority not in "VALID_PRIORITIES":
+#         print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join('VALID_PRIORITIES')}", file=sys.stderr)
+#         sys.exit(1)
+
+#     # Create a new task with additional attributes
+#     tasks = taskload()
+#     tasks.append({
+#         "description": description,
+#         "priority": priority,
+#         "tags": tags,
+#         "completed": completed,
+#     })
+#     tasksave(tasks)
+#     print(f"Added task #{len(tasks)}: {description.strip()} [Priority: {priority}] [Tags: {', '.join(tags)}] [Completed: {completed}]")
+
+
+
+# # Default tasks file (next to this script). Can be overridden with TODO_FILE env var.
+# TASKS_FILE = Path(os.getenv("TODO_FILE", Path(__file__).with_name("tasks.json")))
+
+# # File for user settings
+# CONFIG_FILE = Path(os.getenv("TODO_CONFIG_FILE", Path(__file__).with_name("config.json")))
+
+# # --- Settings Management ---
+# def load_config() -> Dict[str, Any]:
+#     """Load user settings from the config file."""
+#     if not CONFIG_FILE.exists():
+#         return {"dark_mode": False}  # Default settings
+#     try:
+#         with CONFIG_FILE.open("r", encoding="utf-8") as f:
+#             return json.load(f)
+#     except (json.JSONDecodeError, IOError):
+#         # If config is corrupt or unreadable, return defaults
+#         return {"dark_mode": False}
+
+
+# def save_config(config: Dict[str, Any]) -> None:
+#     """Save user settings to the config file."""
+#     try:
+#         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+#         with CONFIG_FILE.open("w", encoding="utf-8") as f:
+#             json.dump(config, f, indent=2)
+#     except IOError as e:
+#         print(f"Error: Could not save settings to {CONFIG_FILE}: {e}", file=sys.stderr)
+#         sys.exit(1)
+
+# def _normalize_tasks(data: Any) -> List[Dict[str, Any]]:
+#     """Normalize raw JSON data into a list of task dicts."""
+#     normalized: List[Dict[str, Any]] = []
+#     if isinstance(data, list):
+#         for item in data:
+#             if isinstance(item, str):  # Legacy task format: simple string
+#                 normalized.append({"description": item, "completed": False, "priority": "Medium", "tags": []})
+#             elif isinstance(item, dict):  # New task format
+#                 desc = item.get("description")
+#                 if isinstance(desc, str):
+#                     normalized.append({
+#                         "description": desc,
+#                         "completed": bool(item.get("completed", False)),
+#                         "priority": item.get("priority", "Medium"),
+#                         "tags": item.get("tags", []),
+#                     })
+#             # ignore other types silently
+#     return normalized
+
+
+# def taskload() -> List[Dict[str, Any]]:
+
+#     if not TASKS_FILE.exists():
+#         return []
+
+#     try:
+#         with TASKS_FILE.open("r", encoding="utf-8") as f:
+#             data = json.load(f)
+#         tasks = _normalize_tasks(data)
+#         # If file was legacy format, persist normalized structure
+#         if isinstance(data, list) and tasks and not isinstance(data[0], dict):
+#             tasksave(tasks)
+#         return tasks
+#     except json.JSONDecodeError:
+#         backupcorrupt("json-decode-error")
+#         return []
+#     except Exception as e:
+#         print(f"Error reading tasks file: {e}", file=sys.stderr)
+#         return []
+
+
+# def backupcorrupt(reason: str) -> None:
+#     """
+#     Backup a corrupted tasks file before resetting.
+
+#     Args:
+#         reason: Description of why the file is being backed up.
+#     """
+#     try:
+#         if TASKS_FILE.exists():
+#             backup_name = TASKS_FILE.with_suffix(f".backup.{reason}")
+#             TASKS_FILE.replace(backup_name)
+#             print(f"Backed up corrupted tasks file to: {backup_name}", file=sys.stderr)
+#     except Exception as e:
+#         print(f"Failed to back up corrupted tasks file: {e}", file=sys.stderr)
+
+
+# def tasksave(tasks: List[Dict[str, Any]]) -> None:
+#     """
+#     Save tasks to the JSON file.
+#     """
+#     TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+#     data = json.dumps(tasks, ensure_ascii=False, indent=2)
+
+#     try:
+#         fd, tmp_path = tempfile.mkstemp(prefix=".tasks-", dir=str(TASKS_FILE.parent))
+#     except (PermissionError, OSError) as e:
+#         print(f"Error: Cannot create temporary file: {e}", file=sys.stderr)
+#         sys.exit(1)
+
+#     try:
+#         try:
+#             with os.fdopen(fd, "w", encoding="utf-8") as tmpf:
+#                 tmpf.write(data)
+#                 tmpf.flush()
+#                 os.fsync(tmpf.fileno())
+#         except (IOError, OSError) as e:
+#             print(f"Error: Cannot write to temporary file: {e}", file=sys.stderr)
+#             sys.exit(1)
+
+#         try:
+#             Path(tmp_path).replace(TASKS_FILE)
+#         except (PermissionError, OSError) as e:
+#             print(f"Error: Cannot save tasks file: {e}", file=sys.stderr)
+#             sys.exit(1)
+#     finally:
+#         # Clean up temporary file if it still exists
+#         if os.path.exists(tmp_path):
+#             try:
+#                 os.remove(tmp_path)
+#             except Exception:
+#                 pass
+
+# def build_parser() -> argparse.ArgumentParser:
+#     """
+#     Build and configure the argument parser for CLI commands.
+#     """
+#     parser = argparse.ArgumentParser(prog="todo.py", description="Simple CLI todo app in python")
+#     sub = parser.add_subparsers(dest="cmd", required=True)
+
+#     p_add = sub.add_parser("add", help="Add a task to the list")
+#     p_add.add_argument("description", help="Task description")
+#     p_add.add_argument(
+#         "--priority",
+#         "-p",
+#         choices=["Low", "Medium", "High"],
+#         default="Medium",
+#         help="Task priority (default: Medium)"
+#     )
+#     p_add.add_argument(
+#         "--tags",
+#         "-t",
+#         nargs="*",
+#         default=[],
+#         help="Tags associated with the task"
+#     )
+#     p_add.add_argument(
+#         "--completed",
+#         "-c",
+#         action="store_true",
+#         help="Mark task as completed"
+#     )
+
+#     p_list = sub.add_parser("list", help="List all tasks sorted by priority")
+
+#     p_remove = sub.add_parser("remove", help="Remove a task by its index (1-based)")
+#     p_remove.add_argument("index", type=int, help="Enter task index to remove")
+
+#     p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
+#     p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
+
+#     p_stats = sub.add_parser("stats", help="Display task analytics (completion rate, priority, tags)")
+
+#     return parser
+
+
+# def validate_task(description: str) -> bool:
+#     """
+#     Validate that a task description is not empty or whitespace-only.
+
+#     Args:
+#         description: The task description to validate.
+
+#     Returns:
+#         True if valid, False otherwise.
+#     """
+#     return description and description.strip()
+
+
+# def cmd_add(description: str, priority: str = "DEFAULT_PRIORITY") -> None:
+#     """
+#     Add a new task with the given description and priority.
+
+#     Args:
+#         description: The task description.
+#         priority: Task priority (Low, Medium, or High). Defaults to Medium.
+#     """
+#     # Validate task is not empty
+#     if not validate_task(description):
+#         print("Error: Task description cannot be empty or whitespace only.", file=sys.stderr)
+#         sys.exit(1)
+
+#     # Validate priority
+#     if priority not in "VALID_PRIORITIES":
+#         print(f"Error: Invalid priority '{priority}'. Must be one of: {', '.join('VALID_PRIORITIES')}", file=sys.stderr)
+#         sys.exit(1)
+
+#     tasks = taskload()
+#     tasks.append({"description": description, "completed": False})
+#     tasksave(tasks)
+#     print(f"Added task #{len(tasks)}: {description.strip()} [Priority: {priority}]")
+
+
+# def cmd_list() -> None:
+#     """
+#     List all tasks, using a dark-mode friendly format if enabled.
+#     """
+#     config = load_config()
+#     dark_mode = config.get("dark_mode", False)
+#     tasks = taskload()
+
+#     if not tasks:
+#         print("No tasks.")
+#         return
+
+#     # Define display characters based on the mode
+#     pending_char = "○" if dark_mode else "[ ]"
+#     completed_char = "●" if dark_mode else "[x]"
+
+#     pending = [(i, t) for i, t in enumerate(tasks, start=1) if not t.get("completed", False)]
+#     completed = [(i, t) for i, t in enumerate(tasks, start=1) if t.get("completed", False)]
+
+#     if pending:
+#         print("Pending tasks:")
+#         for i, t in pending:
+#             print(f"  {pending_char} {i}. {t['description']}")
+#     else:
+#         print("No pending tasks.")
+
+#     if completed:
+#         print("\nCompleted tasks:")
+#         for i, t in completed:
+#             print(f"  {completed_char} {i}. {t['description']} (completed)")
+
+
+# def cmd_remove(index: int) -> None:
+#     """
+#     Remove a task by its index (1-based).
+
+#     Args:
+#         index: The 1-based index of the task to remove.
+#     """
+#     tasks = taskload()
+#     if not tasks:
+#         print("No tasks to remove.")
+#         sys.exit(0)
+#     if index < 1 or index > len(tasks):
+#         print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.")
+#         sys.exit(2)
+#     removed = tasks.pop(index - 1)
+#     removed_text = removed.get("task", str(removed))
+#     removed_priority = removed.get("priority", "")
+#     tasksave(tasks)
+#     desc = removed["description"] if isinstance(removed, dict) else str(removed)
+#     print(f"Removed task #{index}: {desc}")
+
+
+# def cmd_complete(index: int) -> None:
+#     tasks = taskload()
+#     if not tasks:
+#         print("No tasks to complete.")
+#         sys.exit(0)
+#     if index < 1 or index > len(tasks):
+#         print(f"Invalid index: {index}. Must be between 1 and {len(tasks)}.")
+#         sys.exit(2)
+#     task = tasks[index - 1]
+#     if task.get("completed", False):
+#         print(f"Task #{index} is already completed: {task['description']}")
+#         return
+#     task["completed"] = True
+#     tasksave(tasks)
+#     print(f"Marked task #{index} as completed: {task['description']}")
+
+# def cmd_settings(dark_mode: str | None) -> None:
+#     """Update user preferences."""
+#     if dark_mode is None:
+#         # Show current settings if no flag is provided
+#         config = load_config()
+#         status = "on" if config.get("dark_mode", False) else "off"
+#         print(f"Current settings:\n- Dark Mode: {status}")
+#         return
+
+#     config = load_config()
+#     new_status = dark_mode.lower() == 'on'
+#     config['dark_mode'] = new_status
+#     save_config(config)
+#     status_text = "enabled" if new_status else "disabled"
+#     print(f"Dark mode has been {status_text}.")
+
+# def build_parser() -> argparse.ArgumentParser:
+#     """
+#     Build and configure the argument parser for CLI commands.
+
+#     Returns:
+#         Configured ArgumentParser instance.
+#     """
+#     parser = argparse.ArgumentParser(prog="todo.py", description="Simple CLI todo app in python")
+#     sub = parser.add_subparsers(dest="cmd", required=True)
+
+#     p_add = sub.add_parser("add", help="Add a task to the list")
+#     p_add.add_argument("description", help="Task description")
+#     p_add.add_argument(
+#         "--priority",
+#         "-p",
+#         choices="VALID_PRIORITIES",
+#         default="DEFAULT_PRIORITY",
+#         help=f"Task priority (default: {'DEFAULT_PRIORITY'})"
+#     )
+
+#     p_list = sub.add_parser("list", help="List all tasks sorted by priority")
+
+#     p_remove = sub.add_parser("remove", help="Remove a task by its index (1-based)")
+#     p_remove.add_argument("index", type=int, help="Enter task index to remove")
+
+#     p_complete = sub.add_parser("complete", help="Mark a task as completed by its index (1-based)")
+#     p_complete.add_argument("index", type=int, help="Enter task index to mark complete")
+
+#     p_settings = sub.add_parser("settings", help="Configure user preferences")
+#     p_settings.add_argument(
+#         "--dark-mode",
+#         choices=['on', 'off'],
+#         help="Enable or disable dark mode ('on' or 'off')"
+#     )
+
+#     return parser
+
+
+# def main(argv: List[str] | None = None) -> None:
+#     """
+#     Main entry point for the CLI application.
+
+#     Args:
+#         argv: Command-line arguments (uses sys.argv if None).
+#     """
+#     parser = build_parser()
+#     args = parser.parse_args(argv)
+
+#     if args.cmd == "add":
+#         cmd_add(args.description, args.priority)
+#     elif args.cmd == "list":
+#         cmd_list()
+#     elif args.cmd == "remove":
+#         cmd_remove(args.index)
+#     elif args.cmd == "complete":
+#         cmd_complete(args.index)
+#     elif args.cmd == "stats":
+#         show_stats()
+#     elif args.cmd == "settings":
+#         cmd_settings(args.dark_mode)
+
+
+# if __name__ == "__main__":
+#     if validate():
+#         main()
+
+
+
+
+
+
+#!/usr/bin/env python3
+"""
+CLI Todo App - Complete Implementation with All Features
+Includes: Task management, priorities, tags, voice commands, analytics, and more
+"""
+
 import json
 import os
 import sys
-import time
-import uuid
-
-
-import sqlite3
-
+import argparse
+from pathlib import Path
 from datetime import datetime
-from datetime import datetime, timedelta
-from auth import validate
-# Import both functions from your calendar plugin
+from collections import Counter
+
+# Try to import optional dependencies
 try:
-    from plugins.google_calendar import add_to_calendar, fetch_upcoming_events
+    from rich.console import Console
+    from rich.table import Table
+    from rich.progress import Progress, BarColumn, TextColumn
+    from rich.panel import Panel
+    from rich import print as rprint
+    RICH_AVAILABLE = True
 except ImportError:
-    print("Warning: Google Calendar plugin not found. Calendar sync disabled.")
-    def add_to_calendar(*args, **kwargs):
-        pass
-    def fetch_upcoming_events(*args, **kwargs):
-        return []
+    RICH_AVAILABLE = False
+    print("Warning: 'rich' library not found. Install with: pip install rich")
 
-FILE_PATH = "todos.json"
-OFFLINE_QUEUE = "offline_queue.json"
+try:
+    import speech_recognition as sr
+    VOICE_AVAILABLE = True
+except ImportError:
+    VOICE_AVAILABLE = False
 
-undo_stack = []
-redo_stack = []
+# Colors for terminal output (fallback when rich not available)
+class Colors:
+    RESET = '\033[0m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    CYAN = '\033[36m'
+    GRAY = '\033[90m'
+    RED = '\033[31m'
+    BOLD = '\033[1m'
+    STRIKETHROUGH = '\033[9m'
 
-current_authenticated_user = None
+# File paths
+BASE_DIR = Path(__file__).parent
+TASKS_FILE = Path(os.environ.get('TODO_FILE', BASE_DIR / 'tasks.json'))
+CONFIG_FILE = Path(os.environ.get('TODO_CONFIG_FILE', BASE_DIR / 'config.json'))
 
-tags = []
-due_date_obj = None
-recurrence_obj = None
-task = {}
-priority = 1
-show_completed = False
+# Default settings
+DEFAULT_SETTINGS = {
+    'username': '',
+    'require_auth': True,
+    'dark_mode': False
+}
 
-# Load tasks
-def load_todos():
-    if not os.path.exists(FILE_PATH):
-        return []
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r") as f:
-            todos = json.load(f)
-            if not isinstance(todos, list):
-                print("todos.json is not a list. Resetting file.")
-                return []
-            # Remove tasks missing 'task' or with empty descriptions
-            valid_todos = [t for t in todos if "task" in t and t["task"].strip()]
-            if len(valid_todos) != len(todos):
-                save_todos(valid_todos)  # save cleaned list
-            return valid_todos
-    return []
-
-
-# Save tasks to JSON file
-def save_todos(todos):
-    with open(FILE_PATH, "w") as f:
-        json.dump(todos, f, indent=2)
-def snapshot():
-    todos = load_todos()
-    undo_stack.append(json.dumps(todos))
-    redo_stack.clear()
-
-def restore_state(state_json):
-    todos = json.loads(state_json)
-    save_todos(todos)
-
-def restore_state(state_json):
-    todos = json.loads(state_json)
-    save_todos(todos)
-
-def load_offline_queue():
-    if os.path.exists(OFFLINE_QUEUE):
-        with open(OFFLINE_QUEUE, "r") as f:
-            return json.load(f)
-    return []
-
-def save_offline_queue(queue):
-    with open(OFFLINE_QUEUE, "w") as f:
-        json.dump(queue, f, indent=2)
-
-
- # Log offline actions
-def log_offline_action(operation, task_data):
-    queue = load_offline_queue()
-    queue.append({
-        "timestamp": time.time(),
-        "operation": operation,
-        "task_id": task_data.get("id"),
-        "task_data": task_data
-    })
-    save_offline_queue(queue)
-
-def log_task_change(task, change_type, new_data):
-    if "history" not in task:
-        task["history"] = []
-    task["history"].append({
-        "timestamp": time.time(),
-        "change": change_type,
-        "data": new_data
-    })
-    
- # Sync offline actions with server
-def sync_with_server(server_tasks):
-    local_queue = load_offline_queue()
-    for action in local_queue:
-     pass  # implement the logic here?
-    save_offline_queue([])
-    print("Sync complete.")
-
-def load_server_tasks():
-    return load_todos()
-
-# Parse recurrence formats
-def parse_recurrence(recurrence_str):
-    if not recurrence_str:
-        return None
-    legacy_map = {"daily": {"interval": 1, "unit": "d"},
-                  "weekly": {"interval": 1, "unit": "w"},
-                  "monthly": {"interval": 1, "unit": "m"}}
-    if recurrence_str in legacy_map:
-        return legacy_map[recurrence_str]
-    if len(recurrence_str) >= 2 and recurrence_str[-1] in ['d', 'w', 'm']:
-        try:
-            interval = int(recurrence_str[:-1])
-            unit = recurrence_str[-1]
-            return {"interval": interval, "unit": unit}
-        except ValueError:
-            pass
-    return None
-
-def format_recurrence(recurrence):
-    if not recurrence:
-        return "None"
-    unit_names = {"d": "day", "w": "week", "m": "month"}
-    interval = recurrence.get("interval", 1)
-    unit = recurrence.get("unit", "d")
-    unit_name = unit_names.get(unit, "day")
-    if interval > 1:
-        unit_name += "s"
-    return f"Every {interval} {unit_name}"
-
-# --- Functions from the 'main' branch for database interaction ---
-def create_task(task_name, due_date, status='pending'):
-    conn = sqlite3.connect('tasks.db')
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO tasks (name, due_date, status, timestamp) VALUES (?, ?, ?, ?)",
-                   (task_name, due_date, status, datetime.now().timestamp()))
-    conn.commit()
-    conn.close()
-
-def get_all_tasks():
-    conn = sqlite3.connect('tasks.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM tasks")
-    tasks = cursor.fetchall()
-    conn.close()
-    return tasks
-
-# Calculate next due date
-
-
-def calculate_next_due(due_date, recurrence):
-    due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
-    interval = recurrence.get("interval", 1)
-    unit = recurrence.get("unit", "d")
-
-    if unit == "d":
-        next_date = due_date_obj + timedelta(days=interval)
-    elif unit == "w":
-        next_date = due_date_obj + timedelta(weeks=interval)
-    elif unit == "m":
-        month = due_date_obj.month - 1 + interval
-        year = due_date_obj.year + month // 12
-        month = month % 12 + 1
-        day = min(due_date_obj.day, [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
-        next_date = datetime(year, month, day).date()
-    else:
-        next_date = due_date_obj
-    return next_date.strftime("%Y-%m-%d")
-
-# Add a new task with combined features
-def add_todo(task, priority="Medium", tags=None, due_date=None, recurrence=None, auto_sync=True):
-    snapshot()
-    # Validate non-empty task description
-    if not task or not task.strip():
-        print("Error: Task description cannot be empty.")
-        return
-
-    valid_priorities = ["Low", "Medium", "High"]
-    if priority not in valid_priorities:
-        print("Invalid priority. Use: Low, Medium, or High.")
-        return
-
-    if tags is None:
-        tags = []
-
-    due_date_obj = None
-    if due_date:
-        try:
-            due_date_obj = datetime.strptime(due_date, "%Y-%m-%d").date()
-        except ValueError:
-            print("Invalid date format. Please use YYYY-MM-DD.")
-            return
-
-    recurrence_obj = parse_recurrence(recurrence)
-    if recurrence and not recurrence_obj:
-        print("Invalid recurrence format. Use daily, weekly, monthly, or 3d/2w/1m.")
-        return
-    current_user = get_current_user()
-    todos = load_todos()
-    new_task = {
-        "id": str(uuid.uuid4()),
-        "task": task,
-        "priority": priority,
-        "tags": tags,
-        "due_date": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
-        "recurrence": recurrence_obj,
-        "next_due": due_date_obj.strftime("%Y-%m-%d") if due_date_obj else None,
-        "completed": False,
-        "synced": False,
-        "shared_with": [current_user],
-        "history": [
-            {
-                "timestamp": time.time(),
-                "change": "created",
-                "data": {
-                    "task": task,
-                    "priority": priority,
-                    "tags": tags,
-                    "completed": False,
-                }
-            }
-        ]
-    }
-    
-    # Google Calendar Sync (from your branch)
-    if due_date_obj and auto_sync:
-        print(f"Syncing '{task}' to Google Calendar...")
-        try:
-            add_to_calendar(task, due_date_obj)
-            new_task['synced'] = True  # Mark as synced
-            print("📅 Task synced to Google Calendar successfully!")
-        except Exception as e:
-            print(f"❌ Failed to sync with Google Calendar: {e}")
-            
-    todos.append(new_task)
-    save_todos(todos)
-    log_offline_action("add", new_task)
-    
-    tags_str = f"[Tags: {', '.join(tags)}]" if tags else ""
-    due_str = f"[Due: {new_task['due_date']}]" if new_task['due_date'] else ""
-    rec_str = f"[Recurrence: {format_recurrence(recurrence_obj)}]" if recurrence_obj else ""
-    print(f"✅ Added: {task} [Priority: {priority}] {tags_str} {due_str} {rec_str}".strip())
-
-def adjust_priority_by_due_date(task):
-    """
-    Returns auto-adjusted priority if the task has a due date:
-      - Due within 1 day: High
-      - Due within 3 days: Medium
-      - Otherwise: original priority (default: Medium)
-    """
-    due = task.get("due") or task.get("due_date")
-    if not due:
-        return task.get("priority", "Medium")
+def load_settings():
+    """Load user settings from config file."""
     try:
-        due_dt = datetime.strptime(due, "%Y-%m-%d")
-    except (ValueError, TypeError):
-        return task.get("priority", "Medium")
-    delta = due_dt - datetime.now()
-    if delta <= timedelta(days=1):
-        return "High"
-    elif delta <= timedelta(days=3):
-        return "Medium"
-    else:
-        return task.get("priority", "Medium")
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r') as f:
+                return {**DEFAULT_SETTINGS, **json.load(f)}
+        return DEFAULT_SETTINGS.copy()
+    except:
+        return DEFAULT_SETTINGS.copy()
 
-# List all tasks sorted by priority and optionally filtered by tag
-def list_todos(filter_tag=None, sort_by=None):
-    current_user = get_current_user()
-    all_todos = load_todos()
-    todos = [t for t in all_todos if can_access_task(t, current_user)]
-    if not todos:
-        print("No tasks yet!")
-        return
+def save_settings(settings):
+    """Save user settings to config file."""
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        print(f"{Colors.RED}Error saving settings: {e}{Colors.RESET}")
 
-    if filter_tag:
-        todos = [t for t in todos if filter_tag in t.get("tags", [])]
-        if not todos:
-            print(f"No tasks found with tag '{filter_tag}'.")
-            return
-
-    priority_order = {"High": 0, "Medium": 1, "Low": 2}
-    todos.sort(key=lambda x: priority_order.get(x.get("priority", "Medium")))
-
-    for i, task in enumerate(todos):
+def validate_user():
+    """Validate username for authentication."""
+    settings = load_settings()
     
-        tags = ", ".join(task.get("tags", [])) if task.get("tags") else ""
-        tags_str = f"[Tags: {tags}]" if tags else "[Tags: None]"
-
-        due_date = task.get("due_date")
-        due_str = f"[Due: {due_date}]" if due_date else "[Due: None]"
-
-        rec_str = f"[Recurrence: {format_recurrence(task.get('recurrence'))}]"
-        status = "✅ Done" if task.get("completed") else "⏳ Pending"
-
-# Search tasks by text or tag
-        print(f"{i}: {task.get('task', '<No task description>')} "
-          f"[Priority: {task.get('priority', 'Medium')}] {tags_str} {due_str} {rec_str} [{status}]")
-
-def search_todos(search_term):
-    current_user = get_current_user()
-    todos = load_todos()
-    todos = [t for t in todos if can_access_task(t, current_user)]
-    if not todos:
-        print("No tasks found!")
-        return
-
-    matching_tasks = [
-        task for task in todos
-        if search_term.lower() in task['task'].lower() or search_term.lower() in [tag.lower() for tag in task.get("tags", [])]
-    ]
-
-    print(f"Found {len(matching_tasks)} matching task(s) for '{search_term}':")
-    for i, task in enumerate(matching_tasks):
-        tags = ", ".join(task.get("tags", []))
-        due = task.get("due", "N/A")
-        status = " Done" if task.get("completed") else "⏳ Pending"
-        print(f"{i}: {task['task']} [Priority: {task['priority']}] [Tags: {tags}] [Due: {due}] [{status}]")
-
-        # Summary message
-    all_tasks = load_todos()
-    completed = len([t for t in all_tasks if t.get("completed")])
-    pending = len([t for t in all_tasks if not t.get("completed")])
-    high_priority = len([t for t in all_tasks if not t.get("completed") and t.get("priority") == "High"])
-
-    print("\n--- Summary ---")
-    if pending == 0:
-        print("Nice! All your tasks are completed.")
-    else:
-        print(f"You have {pending} pending task{'s' if pending > 1 else ''}.")
-        if high_priority > 0:
-            print(f"{high_priority} high-priority task{'s' if high_priority > 1 else ''} need your attention today!")
-        else:
-            print(" No high-priority tasks pending.")
-
-# Remove a task by index
-def remove_todo(index):
-    snapshot()
-    current_user = get_current_user()
-    todos = load_todos()
-    todos = [t for t in todos if can_access_task(t, current_user)]
-    if 0 <= index < len(todos):
-        log_offline_action("remove", todos[index])
-        removed = todos.pop(index)
-        save_todos(todos)
-        print(f"Removed: {removed['task']} [Priority: {removed['priority']}]")
-        # Check for tasks due today
-        check_due_tasks(todos)
-
-        # List the remaining tasks
-        for i, task in enumerate(todos):
-            due_date_str = task["due_date"] if task["due_date"] else "No due date"
-            print(f"{i}: {task['task']} (Due: {due_date_str})")
-    else:
-        print("Invalid task index.")
-
-# Check and notify if any tasks are due today
-def check_due_tasks(todos):
-    today = datetime.today().date()  # Get today's date
-    due_today = [task for task in todos if task["due_date"] and task["due_date"] == today]
-    
-    if due_today:
-        print("\n **Reminder**: The following tasks are due today:")
-        for task in due_today:
-            print(f" - {task['task']}")
-            if task['recurrence']:
-                task['next_due'] = calculate_next_due(task['due_date'], task['recurrence'])  # Update next_due
-        save_todos(todos)
-    else:
-        print("\n No tasks are due today.")
-
-# Clear all tasks
-def clear_todos():
-    snapshot()
-    current_user = get_current_user()
-    todos = load_todos()
-    other_user_tasks = [t for t in todos if not can_access_task(t, current_user)]
-    save_todos(other_user_tasks)
-    print("All tasks have been cleared.")
-
-# Load plugins from plugins/ folder
-def load_plugins():
-    plugins = {}
-    plugin_dir = "plugins"
-    if os.path.isdir(plugin_dir):
-        for filename in os.listdir(plugin_dir):
-            if filename.endswith(".py"):
-                plugin_name = filename[:-3]
-                try:
-                    module = __import__(f"{plugin_dir}.{plugin_name}", fromlist=["run"])
-                    if hasattr(module, "run"):
-                        plugins[plugin_name] = module.run
-                except Exception as e:
-                    print(f"Failed to load plugin {plugin_name}: {e}")
-    return plugins
-    
-# Edit a task by index
-def edit_todo(index, new_description):
-    current_user = get_current_user()
-    todos = load_todos()
-    todos = [t for t in todos if can_access_task(t, current_user)]
-    if 0 <= index < len(todos):
-        old_task = todos[index]
-        todos[index]['task'] = new_description
-        save_todos(todos)
-        print(f" Updated task {index}:")
-        print(f"   Old: {old_task}")
-        print(f"   New: {todos[index]}")
-    else:
-        print("Invalid task index.")
-
-# Mark complete
-def complete_todo(index):
-    snapshot()
-    todos = load_todos()
-    if 0 <= index < len(todos):
-        todos[index]["completed"] = True
-        log_task_change(todos[index], "completed", {"completed": True})
-        log_offline_action("complete", todos[index])
-        save_todos(todos)
-        print(f"Marked as done: {todos[index]['task']}")
-    else:
-        print("Invalid task index.")
-
-def undo():
-    if not undo_stack:
-        print("Nothing to undo.")
-        return
-    current = json.dumps(load_todos())
-    redo_stack.append(current)
-    previous = undo_stack.pop()
-    restore_state(previous)
-    print("Undo successful.")
-
-def redo():
-    if not redo_stack:
-        print("Nothing to redo.")
-        return
-    undo_stack.append(json.dumps(load_todos()))
-    next_state = redo_stack.pop()
-    restore_state(next_state)
-    print("Redo successful.")
-           
-def rollback_task(index):
-    todos = load_todos()
-    if 0 <= index < len(todos):
-        history = todos[index].get("history", [])
-        if len(history) < 2:
-            print("No previous version to roll back to.")
-            return
-        last = history[-2]["data"]
-        todos[index].update(last)
-        log_task_change(todos[index], "rolled back", last)
-        save_todos(todos)
-        print(f"Rolled back task: {todos[index]['task']}")
-    else:
-        print("Invalid task index.")        
-    print("Redo successful.")            
-
-# Command-line interface
-
-# --- Calendar Sync functions from your branch ---
-def sync_all_tasks_to_calendar():
-    todos = load_todos()
-    tasks_to_sync = [
-        task for task in todos
-        if task.get("due_date") and not task.get("completed") and not task.get("synced")
-    ]
-    
-    if not tasks_to_sync:
-        print("✅ All tasks are already synced.")
-        return
-
-    print(f"Found {len(tasks_to_sync)} tasks to sync.")
-    
-    for task in tasks_to_sync:
-        try:
-            print(f"Syncing '{task['task']}'...")
-            due_date_obj = datetime.strptime(task['due_date'], "%Y-%m-%d").date()
-            add_to_calendar(task['task'], due_date_obj)
-            task['synced'] = True  # Mark the task as synced to prevent duplicates
-        except Exception as e:
-            print(f"❌ Failed to sync '{task['task']}': {e}")
-            
-    save_todos(todos)
-    print("Sync complete.")
-
-def pull_tasks_from_calendar():
-    print("Fetching upcoming events from Google Calendar...")
-    events = fetch_upcoming_events()
-    
-    if events is None:
-        print("❌ Could not fetch events.")
-        return
-
-    if not events:
-        print("✅ No upcoming events found.")
-        return
-
-    todos = load_todos()
-    existing_tasks = {t['task'].lower() for t in todos}
-    new_tasks_added = 0
-
-    for event in events:
-        task_name = event['summary']
-        if task_name.lower() not in existing_tasks:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            due_date = start.split('T')[0]
-
-            # Add the task without auto-syncing it back to the calendar
-            add_todo(task=task_name, due_date=due_date, auto_sync=False)
-            new_tasks_added += 1
-            print(f"➕ Imported task: {task_name} [Due: {due_date}]")
-    
-    if new_tasks_added == 0:
-        print("No new tasks to import.")
-    else:
-        print(f"Import complete. Added {new_tasks_added} new tasks.")
-def get_current_user():
-    
-    global current_authenticated_user
-    if current_authenticated_user is None:
-        username, authenticated = validate()
-        if authenticated:
-            current_authenticated_user = username
-        else:
-            print("Authentication failed. Exiting.")
-            sys.exit(1)
-    return current_authenticated_user
-
-def can_access_task(task, user):
-    shared_with = task.get("shared_with", [])
-    if not shared_with:
+    if not settings.get('require_auth', True):
         return True
-    return user in shared_with
-
-def share_task(task_index, collaborators):
-    current_user = get_current_user()
-    todos = load_todos()
     
-    if 0 <= task_index < len(todos):
-        task = todos[task_index]
-        
-        if not can_access_task(task, current_user):
-            print("You don't have permission to share this task.")
-            return
-        if "shared_with" not in task:
-            task["shared_with"] = [current_user]
-        
-        for collaborator in collaborators:
-            if collaborator not in task["shared_with"]:
-                task["shared_with"].append(collaborator)
-        
-        log_task_change(task, "shared", {"shared_with": task["shared_with"]})
-        save_todos(todos)
-        
-        collab_str = ', '.join(collaborators)
-        print(f"Task '{task['task']}' shared with: {collab_str}")
+    if settings.get('username'):
+        print(f"{Colors.CYAN}============Validating...============{Colors.RESET}")
+        username = input(f"Enter username: ")
+        if username == settings['username']:
+            return True
+        else:
+            print(f"{Colors.RED}Invalid username!{Colors.RESET}")
+            return False
     else:
-        print("Invalid task index.")
+        # First time setup
+        print(f"{Colors.CYAN}============First Time Setup============{Colors.RESET}")
+        username = input(f"Create a username: ")
+        if username.strip():
+            settings['username'] = username.strip()
+            save_settings(settings)
+            print(f"{Colors.GREEN}✓ Username set successfully!{Colors.RESET}")
+            return True
+        else:
+            print(f"{Colors.RED}Username cannot be empty!{Colors.RESET}")
+            return False
 
-def list_shared_tasks():
-    current_user = get_current_user()
-    todos = load_todos()
+def backup_file(filepath):
+    """Create a backup of a file."""
+    try:
+        backup_path = filepath.with_suffix('.json.backup')
+        if filepath.exists():
+            with open(filepath, 'r') as f:
+                content = f.read()
+            with open(backup_path, 'w') as f:
+                f.write(content)
+            print(f"{Colors.YELLOW}Backup created: {backup_path}{Colors.RESET}")
+    except Exception as e:
+        print(f"{Colors.RED}Error creating backup: {e}{Colors.RESET}")
+
+def load_tasks():
+    """Load tasks from JSON file with error handling and backward compatibility."""
+    try:
+        if not TASKS_FILE.exists():
+            return []
+        
+        with open(TASKS_FILE, 'r') as f:
+            tasks = json.load(f)
+        
+        # Ensure backward compatibility
+        normalized_tasks = []
+        for task in tasks:
+            if isinstance(task, str):
+                normalized_tasks.append({
+                    'id': len(normalized_tasks),
+                    'task': task,
+                    'priority': 'Medium',
+                    'completed': False,
+                    'tags': [],
+                    'created_at': datetime.now().isoformat()
+                })
+            else:
+                if 'id' not in task:
+                    task['id'] = len(normalized_tasks)
+                if 'completed' not in task:
+                    task['completed'] = False
+                if 'priority' not in task:
+                    task['priority'] = 'Medium'
+                if 'tags' not in task:
+                    task['tags'] = []
+                if 'created_at' not in task:
+                    task['created_at'] = datetime.now().isoformat()
+                normalized_tasks.append(task)
+        
+        return normalized_tasks
     
-    shared_tasks = []
-    for i, task in enumerate(todos):
-        if can_access_task(task, current_user) and len(task.get("shared_with", [])) > 1:
-            shared_tasks.append((i, task))
+    except json.JSONDecodeError:
+        print(f"{Colors.YELLOW}Warning: Corrupted tasks file detected!{Colors.RESET}")
+        backup_file(TASKS_FILE)
+        print(f"{Colors.YELLOW}Starting with empty task list.{Colors.RESET}")
+        return []
+    except Exception as e:
+        print(f"{Colors.RED}Error loading tasks: {e}{Colors.RESET}")
+        return []
+
+def save_tasks(tasks):
+    """Save tasks to JSON file with error handling."""
+    try:
+        # Reindex tasks
+        for i, task in enumerate(tasks):
+            task['id'] = i
+        
+        with open(TASKS_FILE, 'w') as f:
+            json.dump(tasks, f, indent=2)
+    except PermissionError:
+        print(f"{Colors.RED}Error: Permission denied. Cannot write to {TASKS_FILE}{Colors.RESET}")
+    except OSError as e:
+        print(f"{Colors.RED}Error: Disk I/O error - {e}{Colors.RESET}")
+    except Exception as e:
+        print(f"{Colors.RED}Error saving tasks: {e}{Colors.RESET}")
+
+def calculate_progress(tasks):
+    """Calculate completion statistics."""
+    if not tasks:
+        return {'completed': 0, 'total': 0, 'percentage': 0}
     
-    if not shared_tasks:
-        print("No shared tasks found.")
+    completed = sum(1 for task in tasks if task.get('completed', False))
+    total = len(tasks)
+    percentage = round((completed / total) * 100, 2) if total > 0 else 0
+    
+    return {
+        'completed': completed,
+        'total': total,
+        'percentage': percentage
+    }
+
+def create_progress_bar(percentage, width=30):
+    """Create a visual progress bar."""
+    filled_length = round((width * percentage) / 100)
+    empty_length = width - filled_length
+    
+    filled = '█' * filled_length
+    empty = '░' * empty_length
+    
+    return f"{Colors.GREEN}{filled}{Colors.GRAY}{empty}{Colors.RESET}"
+
+def display_progress_bar(tasks):
+    """Display the progress bar with statistics."""
+    stats = calculate_progress(tasks)
+    progress_bar = create_progress_bar(stats['percentage'])
+    
+    print(f"\n{Colors.CYAN}{Colors.BOLD}Progress:{Colors.RESET} {progress_bar} "
+          f"{Colors.GREEN}{stats['percentage']}%{Colors.RESET} "
+          f"{Colors.GRAY}({stats['completed']}/{stats['total']} completed){Colors.RESET}\n")
+
+def add_task(description, priority='Medium', tags=None, completed=False):
+    """Add a new task with priority, tags, and completion status."""
+    if not description or description.isspace():
+        print(f"{Colors.YELLOW}Error: Task description cannot be empty{Colors.RESET}")
         return
     
-    print("Shared Tasks:")
-    for i, task in shared_tasks:
-        shared_with = task.get("shared_with", [])
-        other_users = [u for u in shared_with if u != current_user]
-        status = "Done" if task.get("completed") else "Pending"
-        print(f"{i}: {task['task']} [{status}]")
-        print(f"    Priority: {task.get('priority', 'Medium')}")
-        print(f"    Shared with: {', '.join(other_users)}")
-        print(f"    Tags: {', '.join(task.get('tags', []))}")
-        print("-" * 30)
-# CLI
-def main():
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print("  python todo.py add \"Task name\" --priority High --tags work --due 2025-10-07")
-        print("  python todo.py list [--tag work]")
-        print("  python todo.py list --completed")
-        print("  python todo.py remove <index>")
-        print("  python todo.py complete <index>")
-        print("  python todo.py clear")
-        print("  python todo.py sync calendar")
-        print("  python todo.py pull calendar")
-        print("  python todo.py <plugin_name> [args...]")
-        print("  python todo.py undo")
-        print("  python todo.py redo")
-        print("  python todo.py sync")
-        print("  python todo.py share <user1> <user2>...")
-        print("  python todo.py list_shared")
-
+    if priority not in ['High', 'Medium', 'Low']:
+        print(f"{Colors.YELLOW}Error: Invalid priority. Use High, Medium, or Low{Colors.RESET}")
         return
+    
+    tasks = load_tasks()
+    new_task = {
+        'id': len(tasks),
+        'task': description.strip(),
+        'priority': priority,
+        'completed': completed,
+        'tags': tags if tags else [],
+        'created_at': datetime.now().isoformat()
+    }
+    tasks.append(new_task)
+    
+    # Sort by priority and completion status
+    priority_order = {'High': 0, 'Medium': 1, 'Low': 2}
+    tasks.sort(key=lambda x: (x.get('completed', False), priority_order.get(x.get('priority', 'Medium'), 1)))
+    
+    save_tasks(tasks)
+    
+    tags_str = f" {Colors.CYAN}[{', '.join(tags)}]{Colors.RESET}" if tags else ""
+    status_str = f" {Colors.GREEN}[✓ Completed]{Colors.RESET}" if completed else ""
+    print(f"{Colors.GREEN}✓{Colors.RESET} Added: \"{description.strip()}\" {Colors.BLUE}[{priority}]{Colors.RESET}{tags_str}{status_str}")
+    display_progress_bar(tasks)
 
-    command = sys.argv[1]
-    if command == "add":
-        args = sys.argv[2:]
-        task = None
-        priority = "Medium"
-        tags = []
-        due_date = None
-        recurrence = None
+def list_tasks():
+    """List all tasks with rich formatting if available."""
+    tasks = load_tasks()
+    
+    if not tasks:
+        print(f"{Colors.YELLOW}No tasks found.{Colors.RESET} Add one with: {Colors.CYAN}python todo.py add \"Your task\"{Colors.RESET}")
+        return
+    
+    display_progress_bar(tasks)
+    
+    # Separate pending and completed tasks
+    pending_tasks = [t for t in tasks if not t.get('completed', False)]
+    completed_tasks = [t for t in tasks if t.get('completed', False)]
+    
+    # Display pending tasks
+    if pending_tasks:
+        print(f"{Colors.CYAN}{Colors.BOLD}Pending tasks:{Colors.RESET}")
+        for task in pending_tasks:
+            display_task(task, '○')
+        print()
+    
+    # Display completed tasks
+    if completed_tasks:
+        print(f"{Colors.GREEN}{Colors.BOLD}Completed tasks:{Colors.RESET}")
+        for task in completed_tasks:
+            display_task(task, '●')
+        print()
 
-        if "--priority" in args:
-            idx = args.index("--priority")
-            priority = args[idx + 1]
-            args = args[:idx] + args[idx + 2:]
-        if "--tags" in args:
-            idx = args.index("--tags")
-            i = idx + 1
-            while i < len(args) and not args[i].startswith("--"):
-                tags.append(args[i])
-                i += 1
-            args = args[:idx] + args[i:]
-        if "--due" in args:
-            idx = args.index("--due")
-            due_date = args[idx + 1]
-            args = args[:idx] + args[idx + 2:]
-        if "--recurrence" in args:
-            idx = args.index("--recurrence")
-            recurrence = args[idx + 1]
-            args = args[:idx] + args[idx + 2:]
+def display_task(task, checkbox):
+    """Display a single task with formatting."""
+    task_id = task.get('id', 0)
+    priority = task.get('priority', 'Medium')
+    completed = task.get('completed', False)
+    tags = task.get('tags', [])
+    
+    # Priority colors
+    priority_colors = {
+        'High': Colors.RED,
+        'Medium': Colors.BLUE,
+        'Low': Colors.GRAY
+    }
+    priority_color = priority_colors.get(priority, Colors.RESET)
+    
+    # Task text styling
+    task_text = task['task']
+    if completed:
+        task_text = f"{Colors.GRAY}{Colors.STRIKETHROUGH}{task_text}{Colors.RESET}"
+    
+    # Tags display
+    tags_str = ""
+    if tags:
+        tags_str = f" {Colors.CYAN}[{', '.join(tags)}]{Colors.RESET}"
+    
+    print(f"  {Colors.YELLOW}{checkbox}{Colors.RESET} {Colors.CYAN}{task_id + 1}.{Colors.RESET} {task_text} {priority_color}({priority}){Colors.RESET}{tags_str}")
 
-        task = " ".join(args)
-        add_todo(task, priority, tags, due_date, recurrence)
+def remove_task(task_id):
+    """Remove a task by ID (1-based index)."""
+    tasks = load_tasks()
+    
+    if not tasks:
+        print(f"{Colors.YELLOW}No tasks to remove{Colors.RESET}")
+        return
+    
+    # Convert to 0-based index
+    index = task_id - 1
+    
+    if 0 <= index < len(tasks):
+        task_to_remove = tasks.pop(index)
+        save_tasks(tasks)
+        print(f"{Colors.GREEN}✓{Colors.RESET} Removed: \"{task_to_remove['task']}\"")
+        if tasks:
+            display_progress_bar(tasks)
+    else:
+        print(f"{Colors.YELLOW}Error: Task ID {task_id} not found. Use 'list' to see available tasks.{Colors.RESET}")
 
-    elif command == "list":
-        tag = None
-        if "--tag" in sys.argv:
-            tag_idx = sys.argv.index("--tag")
-            tag = sys.argv[tag_idx + 1]
-        list_todos(tag)
+def complete_task(task_id):
+    """Toggle task completion status (1-based index)."""
+    tasks = load_tasks()
+    
+    if not tasks:
+        print(f"{Colors.YELLOW}No tasks available{Colors.RESET}")
+        return
+    
+    # Convert to 0-based index
+    index = task_id - 1
+    
+    if 0 <= index < len(tasks):
+        task = tasks[index]
+        task['completed'] = not task.get('completed', False)
+        status = "completed" if task['completed'] else "incomplete"
+        icon = "✓" if task['completed'] else "○"
+        print(f"{Colors.GREEN}{icon}{Colors.RESET} Marked task {task_id} as {Colors.BOLD}{status}{Colors.RESET}: \"{task['task']}\"")
+        save_tasks(tasks)
+        display_progress_bar(tasks)
+    else:
+        print(f"{Colors.YELLOW}Error: Task ID {task_id} not found. Use 'list' to see available tasks.{Colors.RESET}")
 
-    elif command == "remove":
-        remove_todo(int(sys.argv[2]))
+def show_stats():
+    """Display detailed statistics with rich formatting if available."""
+    tasks = load_tasks()
+    
+    if not tasks:
+        print(f"{Colors.YELLOW}No tasks found. Add some tasks to see statistics!{Colors.RESET}")
+        return
+    
+    stats = calculate_progress(tasks)
+    pending = stats['total'] - stats['completed']
+    
+    # Count by priority
+    priority_counts = Counter(t.get('priority', 'Medium') for t in tasks if not t.get('completed'))
+    
+    # Count by tags
+    all_tags = []
+    for task in tasks:
+        all_tags.extend(task.get('tags', []))
+    tag_counts = Counter(all_tags)
+    
+    if RICH_AVAILABLE:
+        console = Console()
+        console.print("\n[cyan bold]════════════════════ Task Analytics Dashboard ════════════════════[/cyan bold]\n")
+        console.print(f"[green]Completion:[/green] {stats['completed']}/{stats['total']} tasks completed ({stats['percentage']}%)\n")
+        
+        # Priority table
+        priority_table = Table(title="Priority Breakdown", show_header=True)
+        priority_table.add_column("Priority", style="cyan")
+        priority_table.add_column("Count", justify="right")
+        
+        for priority in ['High', 'Medium', 'Low']:
+            count = priority_counts.get(priority, 0)
+            priority_table.add_row(priority, str(count))
+        
+        console.print(priority_table)
+        
+        # Tags table
+        if tag_counts:
+            console.print()
+            tag_table = Table(title="Tag Statistics", show_header=True)
+            tag_table.add_column("Tag", style="cyan")
+            tag_table.add_column("Count", justify="right")
+            
+            for tag, count in tag_counts.most_common(10):
+                tag_table.add_row(tag, str(count))
+            
+            console.print(tag_table)
+    else:
+        print(f"\n{Colors.CYAN}{Colors.BOLD}📊 Task Analytics Dashboard{Colors.RESET}")
+        print('═' * 60)
+        
+        display_progress_bar(tasks)
+        
+        print(f"{Colors.CYAN}Total Tasks:{Colors.RESET}        {stats['total']}")
+        print(f"{Colors.GREEN}✓ Completed:{Colors.RESET}        {stats['completed']} {Colors.GRAY}({stats['percentage']}%){Colors.RESET}")
+        print(f"{Colors.YELLOW}○ Pending:{Colors.RESET}          {pending} {Colors.GRAY}({100 - stats['percentage']}%){Colors.RESET}")
+        print()
+        print(f"{Colors.BOLD}Pending by Priority:{Colors.RESET}")
+        print(f"  {Colors.RED}High:{Colors.RESET}     {priority_counts.get('High', 0)}")
+        print(f"  {Colors.BLUE}Medium:{Colors.RESET}   {priority_counts.get('Medium', 0)}")
+        print(f"  {Colors.GRAY}Low:{Colors.RESET}      {priority_counts.get('Low', 0)}")
+        
+        if tag_counts:
+            print()
+            print(f"{Colors.BOLD}Tag Statistics:{Colors.RESET}")
+            for tag, count in tag_counts.most_common(10):
+                print(f"  {Colors.CYAN}{tag}:{Colors.RESET} {count}")
+    
+    if stats['completed'] == stats['total']:
+        print(f"\n{Colors.GREEN}{Colors.BOLD}🎉 Congratulations! All tasks completed!{Colors.RESET}")
+    elif stats['percentage'] >= 75:
+        print(f"\n{Colors.GREEN}Great progress! Keep it up!{Colors.RESET}")
+    elif stats['percentage'] >= 50:
+        print(f"\n{Colors.BLUE}You're halfway there!{Colors.RESET}")
+    elif stats['percentage'] >= 25:
+        print(f"\n{Colors.YELLOW}Good start! Keep going!{Colors.RESET}")
+    
+    print('═' * 60 + '\n')
 
-    elif command == "complete":
-        # Using the improved version from 'main' with error handling
-        if len(sys.argv) == 3:
-            try:
-                index = int(sys.argv[2])
-                complete_todo(index)
-            except ValueError:
-                print("Invalid index. Please provide a number.")
-        else:
-            print("Usage: python todo.py complete <index>")
+def manage_settings(dark_mode=None):
+    """Manage application settings."""
+    settings = load_settings()
+    
+    if dark_mode is not None:
+        settings['dark_mode'] = dark_mode.lower() in ['on', 'true', '1', 'yes']
+        save_settings(settings)
+        status = "enabled" if settings['dark_mode'] else "disabled"
+        print(f"{Colors.GREEN}✓ Dark mode {status}!{Colors.RESET}")
+        return
+    
+    print(f"\n{Colors.CYAN}{Colors.BOLD}⚙️  Settings{Colors.RESET}")
+    print('─' * 40)
+    print(f"Username: {settings.get('username', 'Not set')}")
+    print(f"Authentication: {'Enabled' if settings.get('require_auth') else 'Disabled'}")
+    print(f"Dark Mode: {'Enabled' if settings.get('dark_mode') else 'Disabled'}")
+    print('─' * 40)
+    
+    print("\nOptions:")
+    print("1. Change username")
+    print("2. Toggle authentication")
+    print("3. Toggle dark mode")
+    print("4. Back")
+    
+    choice = input(f"\n{Colors.CYAN}Select option:{Colors.RESET} ")
+    
+    if choice == '1':
+        new_username = input("Enter new username: ")
+        if new_username.strip():
+            settings['username'] = new_username.strip()
+            save_settings(settings)
+            print(f"{Colors.GREEN}✓ Username updated!{Colors.RESET}")
+    elif choice == '2':
+        settings['require_auth'] = not settings.get('require_auth', True)
+        save_settings(settings)
+        status = "enabled" if settings['require_auth'] else "disabled"
+        print(f"{Colors.GREEN}✓ Authentication {status}!{Colors.RESET}")
+    elif choice == '3':
+        settings['dark_mode'] = not settings.get('dark_mode', False)
+        save_settings(settings)
+        status = "enabled" if settings['dark_mode'] else "disabled"
+        print(f"{Colors.GREEN}✓ Dark mode {status}!{Colors.RESET}")
 
-
-    elif command == "clear":
-        clear_todos()
-
-    # Commands from your branch
-    elif command == "sync":
-        if len(sys.argv) > 2 and sys.argv[2] == "calendar":
-            sync_all_tasks_to_calendar()
-        else:
-            print("Unknown sync command. Did you mean 'sync calendar'?")
-
-    elif command == "pull":
-        if len(sys.argv) > 2 and sys.argv[2] == "calendar":
-            pull_tasks_from_calendar()
-        else:
-            print("Unknown pull command. Did you mean 'pull calendar'?")
-
-    elif command == "undo":
-        undo()
-
-    elif command == "redo":
-        redo()         
-
-    elif command == "rollback" and len(sys.argv) == 3:
+def voice_command():
+    """Voice command mode for hands-free interaction."""
+    if not VOICE_AVAILABLE:
+        print(f"{Colors.RED}Voice commands require SpeechRecognition library.{Colors.RESET}")
+        print(f"{Colors.YELLOW}Install with: pip install SpeechRecognition pyaudio{Colors.RESET}")
+        return
+    
+    recognizer = sr.Recognizer()
+    
+    print(f"\n{Colors.CYAN}{Colors.BOLD}🎤 Voice Command Mode{Colors.RESET}")
+    print(f"{Colors.GRAY}Say 'exit' or 'quit' to stop{Colors.RESET}\n")
+    
+    while True:
         try:
-           index = int(sys.argv[2])
-           rollback_task(index)
-        except ValueError:
-           print("Invalid index.")
-    elif command == "share" and len(sys.argv) >= 4:
-        try:
-            task_index = int(sys.argv[2])
-            collaborators = sys.argv[3:]
-
-            share_task(task_index, collaborators)
-        except ValueError:
-            print("Invalid task index.")
+            with sr.Microphone() as source:
+                print(f"{Colors.YELLOW}Listening...{Colors.RESET}")
+                recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                
+                print(f"{Colors.GRAY}Processing...{Colors.RESET}")
+                command = recognizer.recognize_google(audio).lower()
+                print(f"{Colors.CYAN}You said: {command}{Colors.RESET}\n")
+                
+                # Process commands
+                if 'exit' in command or 'quit' in command:
+                    print(f"{Colors.GREEN}Exiting voice mode...{Colors.RESET}")
+                    break
+                elif 'add task' in command or 'add' in command:
+                    task_desc = command.replace('add task', '').replace('add', '').strip()
+                    if task_desc:
+                        add_task(task_desc)
+                    else:
+                        print(f"{Colors.YELLOW}Please specify a task to add{Colors.RESET}")
+                elif 'list' in command or 'show' in command:
+                    list_tasks()
+                elif 'remove' in command:
+                    try:
+                        words = command.split()
+                        task_id = int(words[-1])
+                        remove_task(task_id)
+                    except:
+                        print(f"{Colors.YELLOW}Please specify a task ID to remove{Colors.RESET}")
+                elif 'complete' in command:
+                    try:
+                        words = command.split()
+                        task_id = int(words[-1])
+                        complete_task(task_id)
+                    except:
+                        print(f"{Colors.YELLOW}Please specify a task ID to complete{Colors.RESET}")
+                elif 'stats' in command or 'statistics' in command:
+                    show_stats()
+                else:
+                    print(f"{Colors.YELLOW}Unknown command. Try: add task, list tasks, remove task #, complete task #{Colors.RESET}")
+                
+                print()
+        
+        except sr.WaitTimeoutError:
+            print(f"{Colors.YELLOW}No speech detected. Try again...{Colors.RESET}\n")
+        except sr.UnknownValueError:
+            print(f"{Colors.YELLOW}Could not understand audio. Please speak clearly...{Colors.RESET}\n")
+        except sr.RequestError as e:
+            print(f"{Colors.RED}Error with speech recognition service: {e}{Colors.RESET}")
+            print(f"{Colors.YELLOW}Check your internet connection{Colors.RESET}\n")
+        except KeyboardInterrupt:
+            print(f"\n{Colors.GREEN}Exiting voice mode...{Colors.RESET}")
+            break
         except Exception as e:
-            print(f"Error: {e}")
-    elif command == "list_shared":
-        list_shared_tasks()
-    else:
-        print(f"Unknown command: {command}")
+            print(f"{Colors.RED}Error: {e}{Colors.RESET}\n")
 
-if __name__ == "__main__":
+def main():
+    """Main entry point."""
+    # Check authentication
+    if not validate_user():
+        sys.exit(1)
+    
+    parser = argparse.ArgumentParser(
+        description='CLI Todo App with Progress Tracking, Tags, Voice Commands, and Analytics',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    subparsers = parser.add_subparsers(dest='cmd', help='Available commands')
+    
+    # Add command
+    add_parser = subparsers.add_parser('add', help='Add a new task')
+    add_parser.add_argument('description', type=str, nargs='+', help='Task description')
+    add_parser.add_argument('-p', '--priority', 
+                           choices=['High', 'Medium', 'Low'],
+                           default='Medium',
+                           help='Task priority (default: Medium)')
+    add_parser.add_argument('-t', '--tags', 
+                           nargs='*',
+                           help='Tags for the task')
+    add_parser.add_argument('--completed',
+                           action='store_true',
+                           help='Mark task as completed when adding')
+    
+    # List command
+    subparsers.add_parser('list', help='List all tasks with progress bar')
+    
+    # Remove command
+    remove_parser = subparsers.add_parser('remove', help='Remove a task')
+    remove_parser.add_argument('id', type=int, help='Task ID (1-based)')
+    
+    # Complete command
+    complete_parser = subparsers.add_parser('complete', help='Toggle task completion')
+    complete_parser.add_argument('id', type=int, help='Task ID (1-based)')
+    
+    # Stats command
+    subparsers.add_parser('stats', help='Show task statistics and analytics')
+    
+    # Settings command
+    settings_parser = subparsers.add_parser('settings', help='Manage settings')
+    settings_parser.add_argument('--dark-mode',
+                                choices=['on', 'off'],
+                                help='Enable or disable dark mode')
+    
+    # Voice command
+    subparsers.add_parser('voice', help='Voice command mode')
+    
+    args = parser.parse_args()
+    
+    if args.cmd == 'add':
+        description = ' '.join(args.description)
+        add_task(description, args.priority, args.tags, args.completed)
+    elif args.cmd == 'list':
+        list_tasks()
+    elif args.cmd == 'remove':
+        remove_task(args.id)
+    elif args.cmd == 'complete':
+        complete_task(args.id)
+    elif args.cmd == 'stats':
+        show_stats()
+    elif args.cmd == 'settings':
+        manage_settings(args.dark_mode)
+    elif args.cmd == 'voice':
+        voice_command()
+    else:
+        parser.print_help()
+
+if __name__ == '__main__':
     main()
