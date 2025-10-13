@@ -33,7 +33,7 @@ def run(args):
                         if task.get("tags")
                         else ""
                     )
-                    print(f"  {i + 1}. {task['description']}{tags}")
+                    print(f"  {i + 1}. {task['task']}{tags}")
                 found_tasks = True
         except (json.JSONDecodeError, IOError) as e:
             print(f"⚠️  Could not read Node.js tasks: {e}")
@@ -59,7 +59,7 @@ def run(args):
                         if task.get("tags")
                         else ""
                     )
-                    print(f"  {i + 1}. {task['description']}{tags}")
+                    print(f"  {i + 1}. {task['task']}{tags}")
                 found_tasks = True
         except (json.JSONDecodeError, IOError) as e:
             print(f"⚠️  Could not read Python tasks: {e}")

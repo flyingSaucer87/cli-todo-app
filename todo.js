@@ -1,132 +1,276 @@
-// todo.js
-import fs from "fs";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const filePath = "todos.json";
-let todos = [];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Load tasks from the JSON file
+const TODO_FILE = process.env.TODO_FILE || path.join(__dirname, 'todos.json');
+
+// Colors for terminal output
+const colors = {
+  reset: '\x1b[0m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+  red: '\x1b[31m',
+  strikethrough: '\x1b[9m'
+};
+
+const VALID_PRIORITIES = ['High', 'Medium', 'Low'];
+
 function loadTodos() {
-  if (fs.existsSync(filePath)) {
-    const data = fs.readFileSync(filePath, "utf-8");
-    const parsedData = JSON.parse(data);
-
-    // Clear existing todos without breaking reference
-    todos.length = 0;
-
-    // Handle legacy format (array of strings)
-    if (Array.isArray(parsedData) && parsedData.length > 0 && typeof parsedData[0] === "string") {
-      const migratedTasks = parsedData.map((task) => ({
-        description: task,
-        completed: false,
-        priority: "Medium",
-        tags: [],
-      }));
-      todos.push(...migratedTasks);
-      saveTodos();
-    } else if (Array.isArray(parsedData)) {
-      todos.push(...parsedData);
+  try {
+    if (!fs.existsSync(TODO_FILE)) {
+      return [];
     }
+    const data = fs.readFileSync(TODO_FILE, 'utf8');
+    const todos = JSON.parse(data);
+    
+    // Ensure all todos have required fields (backward compatibility)
+    return todos.map(todo => {
+      if (typeof todo === 'string') {
+        return { 
+          task: todo, 
+          completed: false,
+          priority: 'Medium',
+          tags: []
+        };
+      }
+      return { 
+        task: todo.task || '',
+        completed: todo.completed || false,
+        priority: todo.priority || 'Medium',
+        tags: todo.tags || []
+      };
+    });
+  } catch (error) {
+    console.error('Error loading todos:', error.message);
+    return [];
   }
 }
 
-// Save tasks to JSON file
-function saveTodos() {
-  fs.writeFileSync(filePath, JSON.stringify(todos, null, 2));
+function saveTodos(todos) {
+  try {
+    fs.writeFileSync(TODO_FILE, JSON.stringify(todos, null, 2));
+  } catch (error) {
+    console.error('Error saving todos:', error.message);
+  }
 }
 
-// Helper: get sorted/filtered list for display and operations
-function getSortedTodos(filterCompleted = null, filterTag = null) {
-  let filtered = todos;
-  if (filterCompleted !== null) {
-    filtered = filtered.filter((t) => t.completed === filterCompleted);
-  }
-  if (filterTag) {
-    filtered = filtered.filter((t) => t.tags && t.tags.includes(filterTag));
-  }
-  const priorityOrder = { High: 0, Medium: 1, Low: 2 };
-  return filtered.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+function sortTodosByPriority(todos) {
+  const priorityOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
+  return [...todos].sort((a, b) => {
+    // Completed tasks go to the bottom
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    // Sort by priority
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
 }
 
-// Add a new task with metadata
-export function addTodo(description, priority = "Medium", tags = []) {
-  const valid = ["Low", "Medium", "High"];
-  if (!valid.includes(priority)) {
-    console.log("Invalid priority. Use Low, Medium, or High.");
-    return;
+function calculateProgress(todos) {
+  if (todos.length === 0) {
+    return { completed: 0, total: 0, percentage: 0 };
   }
-  todos.push({
-    description: description.trim(),
+  
+  const completed = todos.filter(t => t.completed).length;
+  const total = todos.length;
+  const percentage = Math.round((completed / total) * 100);
+  
+  return { completed, total, percentage };
+}
+
+function createProgressBar(percentage, width = 30) {
+  const filledLength = Math.round((width * percentage) / 100);
+  const emptyLength = width - filledLength;
+  
+  const filled = '█'.repeat(filledLength);
+  const empty = '░'.repeat(emptyLength);
+  
+  return `${colors.green}${filled}${colors.gray}${empty}${colors.reset}`;
+}
+
+function displayProgressBar(todos) {
+  const { completed, total, percentage } = calculateProgress(todos);
+  const progressBar = createProgressBar(percentage);
+  
+  console.log(`\n${colors.cyan}Progress:${colors.reset} ${progressBar} ${colors.green}${percentage}%${colors.reset} (${completed}/${total} tasks completed)\n`);
+}
+
+function getPriorityColor(priority) {
+  switch (priority) {
+    case 'High':
+      return colors.red;
+    case 'Medium':
+      return colors.yellow;
+    case 'Low':
+      return colors.blue;
+    default:
+      return colors.reset;
+  }
+}
+
+export function addTodo(task, priority = 'Medium', tags = []) {
+  if (!task || task.trim() === '') {
+    console.error('Error: Task description cannot be empty');
+    process.exit(1);
+  }
+
+  if (!VALID_PRIORITIES.includes(priority)) {
+    console.error(`Error: Invalid priority "${priority}". Valid priorities are: ${VALID_PRIORITIES.join(', ')}`);
+    process.exit(1);
+  }
+
+  const todos = loadTodos();
+  todos.push({ 
+    task: task.trim(), 
     completed: false,
     priority,
-    tags: Array.isArray(tags) ? tags : [],
+    tags
   });
-  saveTodos();
+  saveTodos(todos);
+  console.log(`${colors.green}✓${colors.reset} Added: "${task}"`);
+  displayProgressBar(todos);
 }
 
-// List tasks in display order
-export function listTodos(filterCompleted = null, filterTag = null) {
-  const sorted = getSortedTodos(filterCompleted, filterTag);
-  if (sorted.length === 0) {
-    console.log("No tasks yet!");
+export function listTodos(filters = {}) {
+  let todos = loadTodos();
+  
+  if (todos.length === 0) {
+    console.log('No todos found. Add one with: node index.js add "Your task"');
     return;
   }
-  sorted.forEach((task, i) => {
-    const status = task.completed ? "✓" : "○";
-    const tags = task.tags.length ? ` [${task.tags.join(", ")}]` : "";
-    console.log(`${status} ${i}: ${task.description} (${task.priority})${tags}`);
+
+  // Apply filters
+  if (filters.completed !== undefined) {
+    todos = todos.filter(t => t.completed === filters.completed);
+  }
+
+  if (filters.tag) {
+    todos = todos.filter(t => t.tags && t.tags.includes(filters.tag));
+  }
+
+  // Sort by priority
+  todos = sortTodosByPriority(todos);
+  
+  displayProgressBar(loadTodos()); // Show overall progress
+  
+  console.log(`${colors.cyan}Your Tasks:${colors.reset}`);
+  
+  // Get original indices
+  const allTodos = loadTodos();
+  
+  todos.forEach((todo) => {
+    const originalIndex = allTodos.findIndex(t => 
+      t.task === todo.task && 
+      t.completed === todo.completed && 
+      t.priority === todo.priority &&
+      JSON.stringify(t.tags) === JSON.stringify(todo.tags)
+    );
+    
+    const checkbox = todo.completed ? `${colors.green}[✓]${colors.reset}` : '[ ]';
+    const taskText = todo.completed 
+      ? `${colors.gray}${colors.strikethrough}${todo.task}${colors.reset}` 
+      : todo.task;
+    
+    const priorityColor = getPriorityColor(todo.priority);
+    const priorityLabel = `${priorityColor}[${todo.priority}]${colors.reset}`;
+    
+    const tagsText = todo.tags && todo.tags.length > 0 
+      ? ` ${colors.gray}#${todo.tags.join(' #')}${colors.reset}`
+      : '';
+    
+    console.log(`${originalIndex}. ${checkbox} ${priorityLabel} ${taskText}${tagsText}`);
   });
 }
 
-// Remove by display index
-export function removeTodo(idx) {
-  const sorted = getSortedTodos();
-  if (idx < 0 || idx >= sorted.length) {
-    console.log("Invalid task index.");
-    return;
+export function editTodo(index, newTask, newPriority, newTags) {
+  const todos = loadTodos();
+  
+  if (index < 0 || index >= todos.length) {
+    console.error('Invalid todo index');
+    process.exit(1);
   }
-  const original = todos.indexOf(sorted[idx]);
-  const removed = todos.splice(original, 1)[0];
-  saveTodos();
-  console.log(`Removed: ${removed.description}`);
+  
+  const oldTask = todos[index].task;
+  const oldPriority = todos[index].priority;
+  const oldTags = todos[index].tags;
+  
+  if (newTask !== undefined) {
+    if (newTask.trim() === '') {
+      console.error('Error: Task description cannot be empty');
+      process.exit(1);
+    }
+    todos[index].task = newTask.trim();
+  }
+  
+  if (newPriority !== undefined) {
+    if (!VALID_PRIORITIES.includes(newPriority)) {
+      console.error(`Error: Invalid priority "${newPriority}". Valid priorities are: ${VALID_PRIORITIES.join(', ')}`);
+      process.exit(1);
+    }
+    todos[index].priority = newPriority;
+  }
+  
+  if (newTags !== undefined) {
+    todos[index].tags = newTags;
+  }
+  
+  saveTodos(todos);
+  
+  let changes = [];
+  if (newTask !== undefined && newTask !== oldTask) {
+    changes.push(`task: "${oldTask}" → "${todos[index].task}"`);
+  }
+  if (newPriority !== undefined && newPriority !== oldPriority) {
+    changes.push(`priority: ${oldPriority} → ${newPriority}`);
+  }
+  if (newTags !== undefined && JSON.stringify(newTags) !== JSON.stringify(oldTags)) {
+    changes.push(`tags: [${oldTags.join(', ')}] → [${newTags.join(', ')}]`);
+  }
+  
+  if (changes.length > 0) {
+    console.log(`${colors.green}✓${colors.reset} Updated task ${index}: ${changes.join(', ')}`);
+  } else {
+    console.log(`${colors.green}✓${colors.reset} Updated task ${index}: "${todos[index].task}"`);
+  }
 }
 
-// Edit by display index
-export function editTodo(idx, newDesc, newPriority, newTags) {
-  const sorted = getSortedTodos();
-  if (idx < 0 || idx >= sorted.length) {
-    console.log("Invalid task index.");
-    return;
+export function removeTodo(index) {
+  const todos = loadTodos();
+  
+  if (index < 0 || index >= todos.length) {
+    console.error('Invalid todo index');
+    process.exit(1);
   }
-  const original = todos.indexOf(sorted[idx]);
-  const task = todos[original];
-  if (newDesc) task.description = newDesc;
-  if (newPriority) task.priority = newPriority;
-  if (newTags !== undefined) task.tags = Array.isArray(newTags) ? newTags : [];
-  saveTodos();
-  console.log(`Updated task ${idx}: ${task.description} (${task.priority})`);
+  
+  const removed = todos.splice(index, 1);
+  saveTodos(todos);
+  console.log(`${colors.green}✓${colors.reset} Removed: "${removed[0].task}"`);
+  displayProgressBar(todos);
 }
 
-// Complete by display index
-export function completeTodo(idx) {
-  const sorted = getSortedTodos();
-  if (idx < 0 || idx >= sorted.length) {
-    console.log("Invalid task index.");
-    return;
+export function toggleTodo(index) {
+  const todos = loadTodos();
+  
+  if (index < 0 || index >= todos.length) {
+    console.error('Invalid todo index');
+    process.exit(1);
   }
-  const original = todos.indexOf(sorted[idx]);
-  todos[original].completed = true;
-  saveTodos();
-  console.log(`✓ Marked as completed: ${todos[original].description}`);
+  
+  todos[index].completed = !todos[index].completed;
+  saveTodos(todos);
+  
+  const status = todos[index].completed ? 'completed' : 'uncompleted';
+  console.log(`${colors.green}✓${colors.reset} Marked task ${index} as ${status}: "${todos[index].task}"`);
+  displayProgressBar(todos);
 }
 
-// Clear all tasks
 export function clearTodos() {
-  todos.length = 0;
-  saveTodos();
+  saveTodos([]);
+  console.log(`${colors.green}✓${colors.reset} All todos cleared`);
 }
-
-// Initialize on load
-loadTodos();
-
-// Optional: export for testing or debugging
-export { loadTodos, todos };
