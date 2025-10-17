@@ -590,6 +590,8 @@ def load_tasks():
                     task['tags'] = []
                 if 'created_at' not in task:
                     task['created_at'] = datetime.now().isoformat()
+                if 'depends_on' not in task:
+                    task['depends-on'] = []
                 normalized_tasks.append(task)
         
         return normalized_tasks
@@ -618,6 +620,81 @@ def save_tasks(tasks):
         print(f"{Colors.RED}Error: Disk I/O error - {e}{Colors.RESET}")
     except Exception as e:
         print(f"{Colors.RED}Error saving tasks: {e}{Colors.RESET}")
+
+def check_for_cycle(tasks, start_index, target_index):
+    if start_index == target_index:
+        return True 
+        
+    stack = [target_index]
+    visited = set()
+    
+    while stack:
+        current_index = stack.pop()
+        
+        if current_index == start_index:
+            return True 
+        
+        if current_index in visited:
+            continue
+            
+        visited.add(current_index)
+        
+        prerequisites = tasks[current_index].get('depends_on', [])
+        
+        for prereq_index in prerequisites:
+            # Only push valid indices onto the stack
+            if 0 <= prereq_index < len(tasks):
+                stack.append(prereq_index)
+                
+    return False
+
+def add_dependency(task_id: int, prerequisite_id: int):
+    """Adds a dependency: task_id depends on prerequisite_id (1-based indices)."""
+    tasks = load_tasks()
+    
+    task_idx = task_id - 1
+    prereq_idx = prerequisite_id - 1
+    
+    # Validation and bounds check
+    if not (0 <= task_idx < len(tasks) and 0 <= prereq_idx < len(tasks)):
+        print(f"{Colors.YELLOW}Error: One or both task IDs are invalid. Use 'list' to see available IDs.{Colors.RESET}")
+        return
+
+    task = tasks[task_idx]
+    prereq = tasks[prereq_idx]
+
+    # Cyclic Dependency Check
+    if check_for_cycle(tasks, task_idx, prereq_idx):
+        print(f"{Colors.RED}🛑 Error: Adding '{task['task']}' dependency on '{prereq['task']}' creates a circular dependency!{Colors.RESET}")
+        return
+
+    # Add Dependency
+    if prereq_idx not in task.get('depends_on', []):
+        task['depends_on'].append(prereq_idx)
+        save_tasks(tasks)
+        print(f"{Colors.GREEN}✓ Success:{Colors.RESET} Task {task_id} ('{task['task']}') now depends on Task {prerequisite_id} ('{prereq['task']}').")
+    else:
+        print(f"{Colors.YELLOW}Warning:{Colors.RESET} Dependency already exists.")
+
+def remove_dependency(task_id: int, prerequisite_id: int):
+    #Removes a dependency:
+    tasks = load_tasks()
+    
+    task_idx = task_id - 1
+    prereq_idx = prerequisite_id - 1
+    
+    if not (0 <= task_idx < len(tasks) and 0 <= prereq_idx < len(tasks)):
+        print(f"{Colors.YELLOW}Error: One or both task IDs are invalid. Use 'list' to see available IDs.{Colors.RESET}")
+        return
+
+    task = tasks[task_idx]
+    
+    if prereq_idx in task.get('depends_on', []):
+        task['depends_on'].remove(prereq_idx)
+        save_tasks(tasks)
+        print(f"{Colors.GREEN}Success:{Colors.RESET} Removed dependency: Task {task_id} no longer depends on Task {prerequisite_id}.")
+    else:
+        print(f"{Colors.YELLOW}Warning:{Colors.RESET} Task {task_id} does not depend on Task {prerequisite_id}.")
 
 def calculate_progress(tasks):
     """Calculate completion statistics."""
@@ -773,6 +850,27 @@ def complete_task(task_id):
     
     if 0 <= index < len(tasks):
         task = tasks[index]
+
+        #dependency check logic
+        if not task.get('completed', False): # Only check dependencies if user is trying to COMPLETE the task
+            incomplete_prereqs = []
+            
+            # Check each prerequisite stored as a 0-based index
+            for prereq_idx in task.get('depends_on', []):
+                # Ensure the prerequisite index is valid and the task is incomplete
+                if 0 <= prereq_idx < len(tasks) and not tasks[prereq_idx].get('completed', False):
+                    incomplete_prereqs.append({
+                        'id': prereq_idx + 1,
+                        'task': tasks[prereq_idx]['task']
+                    })
+
+            if incomplete_prereqs:
+                print(f"{Colors.RED}{Colors.BOLD}WARNING: Cannot complete Task {task_id}!{Colors.RESET}")
+                print(f"{Colors.YELLOW}The following prerequisite tasks are still pending:{Colors.RESET}")
+                for prereq in incomplete_prereqs:
+                    print(f"  - [{Colors.CYAN}{prereq['id']}{Colors.RESET}] {prereq['task']}")
+                return 
+
         task['completed'] = not task.get('completed', False)
         status = "completed" if task['completed'] else "incomplete"
         icon = "✓" if task['completed'] else "○"
@@ -1010,7 +1108,21 @@ def main():
     # Complete command
     complete_parser = subparsers.add_parser('complete', help='Toggle task completion')
     complete_parser.add_argument('id', type=int, help='Task ID (1-based)')
+
+    #Depends command
+    depends_parser = subparsers.add_parser('depends', help='Manage task dependencies')
+    depends_subparsers = depends_parser.add_subparsers(dest='depends_cmd', help='Dependency sub-commands')
     
+    # Depends Add command
+    depends_add_parser = depends_subparsers.add_parser('add', help='Add a dependency: Task A depends on Task B')
+    depends_add_parser.add_argument('task_id', type=int, help='ID of the task to receive the dependency (Task A)')
+    depends_add_parser.add_argument('prerequisite_id', type=int, help='ID of the task it depends on (Task B)')
+
+    # Depends Remove command 
+    depends_remove_parser = depends_subparsers.add_parser('remove', help='Remove a dependency')
+    depends_remove_parser.add_argument('task_id', type=int, help='ID of the task to modify')
+    depends_remove_parser.add_argument('prerequisite_id', type=int, help='ID of the prerequisite to remove')
+
     # Stats command
     subparsers.add_parser('stats', help='Show task statistics and analytics')
     
@@ -1034,6 +1146,13 @@ def main():
         remove_task(args.id)
     elif args.cmd == 'complete':
         complete_task(args.id)
+    elif args.cmd == 'depands': 
+        if args.depends_cmd == 'add':
+            add_dependency(args.task_id, args.prerequisite_id)
+        elif args.depends_cmd == 'remove':
+            remove_dependency(args.task_id, args.prerequisite_id)
+        else:
+            depends_parser.print_help()
     elif args.cmd == 'stats':
         show_stats()
     elif args.cmd == 'settings':
