@@ -814,6 +814,21 @@ def display_task(task, checkbox):
     tags_str = ""
     if tags:
         tags_str = f" {Colors.CYAN}[{', '.join(tags)}]{Colors.RESET}"
+
+    # Dependency Indicator 
+    dependency_str = ""
+    # Check if this task has incomplete prerequisites
+    if not task.get('completed', False):
+        incomplete_count = 0
+        tasks = load_tasks() #relaod tasks
+        for prereq_idx in task.get('depends_on', []):
+            if 0 <= prereq_idx < len(tasks) and not tasks[prereq_idx].get('completed', False):
+                incomplete_count += 1
+        
+        if incomplete_count > 0:
+            dependency_str = f" {Colors.RED}🔗 ({incomplete_count} blocked){Colors.RESET}"
+        elif task.get('depends_on'):
+             dependency_str = f" {Colors.GREEN}🔗{Colors.RESET}"
     
     print(f"  {Colors.YELLOW}{checkbox}{Colors.RESET} {Colors.CYAN}{task_id + 1}.{Colors.RESET} {task_text} {priority_color}({priority}){Colors.RESET}{tags_str}")
 
