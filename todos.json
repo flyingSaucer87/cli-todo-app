@@ -11,6 +11,7 @@
     "next_due": "2025-09-08",
     "completed": false,
     "synced": false,
+    "depends_on" : [],
     "shared_with": [
       "eleena",
       "emley"
