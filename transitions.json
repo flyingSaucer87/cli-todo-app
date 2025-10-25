@@ -1,0 +1,89 @@
+{
+  "en": {
+    "welcome_message": "Welcome to the To-Do CLI Tool!",
+    "prompt_add": "Enter task description:",
+    "task_added_success": "Task successfully added." ,
+    "task_removed_success": "Task removed successfully.",
+    "tasks_listed_title": "Your To-Do List:",
+    "task_not_found": "Error: Task not found.",
+    "all_tasks_cleared": "All tasks cleared.",
+
+    "error_unknown_command": "Error: Unknown command '{command}'.",
+    "error_missing_description": "Error: Please provide a task description.",
+    "usage_add": "Usage: node index.js add \"Your task\" [--priority <level>] [--tags <tags>]",
+    "error_missing_index": "Error: Please provide an index.",
+    "usage_complete": "Usage: node index.js complete <index>",
+    "usage_remove": "Usage: node index.js remove <index>",
+    "error_invalid_index": "Error: Please provide a valid task index.",
+    "usage_edit": "Usage: node index.js edit <index> [--description <text>] [--priority <level>] [--tags <tags>]",
+    "error_missing_edit_flag": "Error: Please provide at least one flag to edit (--description, --priority, or --tags)",
+  
+    "py_error_loading_tasks": "Error loading tasks: {e}",
+    "py_error_saving_tasks": "Error saving tasks: {e}",
+    "py_error_invalid_username": "Invalid username!",
+    "py_enter_username": "Enter username: ",
+    "py_error_task_not_found": "Error: Task ID {task_id} not found. Use 'list' to see available tasks.",
+    "py_no_tasks_to_remove": "No tasks to remove",
+    "py_removed_success": "✓ Removed: \"{task_name}\""
+},
+
+
+  "es": {
+    "welcome_message": "¡Bienvenido a la herramienta To-Do CLI!",
+    "prompt_add": "Introduce la descripción de la tarea:",
+    "task_added_success": "Tarea añadida con éxito.",
+    "task_removed_success": "Tarea eliminada con éxito.",
+    "tasks_listed_title": "Tu lista de tareas:",
+    "task_not_found": "Error: Tarea no encontrada.",
+    "all_tasks_cleared": "Todas las tareas eliminadas.",
+
+    "error_unknown_command": "Error: Comando desconocido '{command}'.",
+    "error_missing_description": "Error: Por favor, proporciona una descripción para la tarea.",
+    "usage_add": "Uso: node index.js add \"Tu tarea\" [--priority <nivel>] [--tags <etiquetas>]",
+    "error_missing_index": "Error: Por favor, proporciona un índice.",
+    "usage_complete": "Uso: node index.js complete <índice>",
+    "usage_remove": "Uso: node index.js remove <índice>",
+    "error_invalid_index": "Error: Por favor, proporciona un índice de tarea válido.",
+    "usage_edit": "Uso: node index.js edit <índice> [--description <texto>] [--priority <nivel>] [--tags <etiquetas>]",
+    "error_missing_edit_flag": "Error: Proporciona al menos una opción para editar (--description, --priority, o --tags)",
+  
+    "py_error_loading_tasks": "Error al cargar tareas: {e}",
+    "py_error_saving_tasks": "Error al guardar tareas: {e}",
+    "py_error_invalid_username": "¡Nombre de usuario inválido!",
+    "py_enter_username": "Ingresa tu nombre de usuario: ",
+    "py_error_task_not_found": "Error: ID de tarea {task_id} no encontrado. Usa 'list' para ver las tareas disponibles.",
+    "py_no_tasks_to_remove": "No hay tareas para eliminar",
+    "py_removed_success": "✓ Eliminado: \"{task_name}\""
+
+},
+
+
+
+  "hi": {
+    "welcome_message": "टू-डू सीएलआई टूल में आपका स्वागत है!",
+    "prompt_add": "कार्य विवरण दर्ज करें:",
+    "task_added_success": "कार्य सफलतापूर्वक जोड़ा गया।",
+    "task_removed_success": "कार्य सफलतापूर्वक हटा दिया गया।",
+    "tasks_listed_title": "आपकी टू-डू सूची:",
+    "task_not_found": "त्रुटि: कार्य नहीं मिला।",
+    "all_tasks_cleared": "सभी कार्य साफ़ कर दिए गए।",
+    
+    "error_unknown_command": "त्रुटि: अज्ञात कमांड '{command}'।",
+    "error_missing_description": "त्रुटि: कृपया कार्य का विवरण प्रदान करें।",
+    "usage_add": "उपयोग: node index.js add \"आपका कार्य\" [--priority <स्तर>] [--tags <टैग>]",
+    "error_missing_index": "त्रुटि: कृपया एक इंडेक्स प्रदान करें।",
+    "usage_complete": "उपयोग: node index.js complete <इंडेक्स>",
+    "usage_remove": "उपयोग: node index.js remove <इंडेक्स>",
+    "error_invalid_index": "त्रुटि: कृपया एक मान्य कार्य इंडेक्स प्रदान करें।",
+    "error_usage_edit": "उपयोग: node index.js edit <इंडेक्स> [--description <टेक्स्ट>] [--priority <स्तर>] [--tags <टैग>]",
+    "error_missing_edit_flag": "त्रुटि: कृपया संपादित करने के लिए कम से कम एक फ़्लैग प्रदान करें (--description, --priority, या --tags)",
+
+    "py_error_loading_tasks": "कार्यों को लोड करने में त्रुटि: {e}",
+    "py_error_saving_tasks": "कार्यों को सहेजने में त्रुटि: {e}",
+    "py_error_invalid_username": "अमान्य उपयोगकर्ता नाम!",
+    "py_enter_username": "उपयोगकर्ता नाम दर्ज करें: ",
+    "py_error_task_not_found": "त्रुटि: कार्य आईडी {task_id} नहीं मिला। उपलब्ध कार्यों को देखने के लिए 'list' का उपयोग करें।",
+    "py_no_tasks_to_remove": "हटाने के लिए कोई कार्य नहीं है",
+    "py_removed_success": "✓ हटाया गया: \"{task_name}\""
+  }
+}
