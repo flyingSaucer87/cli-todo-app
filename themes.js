@@ -15,4 +15,9 @@ export const themes = {
     secondary: "#A7C7E7",
     accent: "#C1E1C1"
   }
+  matrix: {
+    primary: "#00FF00",
+    secondary: "#003300",
+    accent: "#00CC00"
+  }
 };
