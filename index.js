@@ -1,3 +1,4 @@
+import { setLanguage, t } from './utils/i18n.js';
 import { addTodo, listTodos, editTodo, removeTodo, toggleTodo, clearTodos } from './todo.js';
 
 const args = process.argv.slice(2);
@@ -87,11 +88,14 @@ if (command === "help" || args.length === 0 || command === undefined) {
 
 const { flags, positional } = parseFlags(args.slice(1));
 
+const lang = flags.lang || process.env.TODO_LANG;
+setLanguage(lang);
+
 switch (command) {
   case "add": {
     if (positional.length === 0) {
-      console.error('Error: Please provide a task description');
-      console.log('Usage: node index.js add "Your task" [--priority <level>] [--tags <tags>]');
+      console.error(t('error_missing_description'));
+      console.log(t('usage_add'));
       process.exit(1);
     }
     
@@ -122,14 +126,14 @@ switch (command) {
 
   case "complete": {
     if (positional.length === 0) {
-      console.error('Error: Please provide an index');
-      console.log('Usage: node index.js complete <index>');
+      console.error(t('error_missing_index'));
+      console.log(t('usage_complete'));
       process.exit(1);
     }
     
     const index = parseInt(positional[0], 10);
     if (isNaN(index)) {
-      console.error('Error: Please provide a valid task index.');
+      console.error(t('error_invalid_index'));
       process.exit(1);
     }
     
@@ -139,14 +143,14 @@ switch (command) {
 
   case "remove": {
     if (positional.length === 0) {
-      console.error('Error: Please provide an index');
-      console.log('Usage: node index.js remove <index>');
+      console.error(t('error_missing_index'));
+      console.log(t('usage_remove'));
       process.exit(1);
     }
     
     const index = parseInt(positional[0], 10);
     if (isNaN(index)) {
-      console.error('Error: Please provide a valid task index.');
+      console.error(t('error_invalid_index'));
       process.exit(1);
     }
     
@@ -156,14 +160,14 @@ switch (command) {
 
   case "edit": {
     if (positional.length === 0) {
-      console.error('Error: Please provide an index');
-      console.log('Usage: node index.js edit <index> [--description <text>] [--priority <level>] [--tags <tags>]');
+      console.error(t('error_missing_index'));
+      console.log(t('usage_edit'));
       process.exit(1);
     }
     
     const index = parseInt(positional[0], 10);
     if (isNaN(index)) {
-      console.error('Error: Please provide a valid task index.');
+      console.error(t('error_invalid_index'));
       process.exit(1);
     }
     
@@ -172,7 +176,7 @@ switch (command) {
     const newTags = flags.tags !== undefined ? parseTags(flags.tags) : undefined;
     
     if (newDescription === undefined && newPriority === undefined && newTags === undefined) {
-      console.error('Error: Please provide at least one flag to edit (--description, --priority, or --tags)');
+      console.error(t('error_missing_edit_flag'));
       process.exit(1);
     }
     
@@ -186,7 +190,24 @@ switch (command) {
   }
 
   default:
-    console.error(`Unknown command: ${command}`);
+    console.error(t('error_unknown_command', { command: command }));
     showHelp();
     process.exit(1);
+}
+
+function showHelp() {
+  console.log(`
+Usage: node index.js <command> [arguments] [flags]
+
+Commands:
+// ... (all your commands) ...
+  clear               Clear all tasks
+  help                Show this help message
+
+Global Flags:
+  --lang <lang>       Set language (e.g., "en", "es", "hi")
+
+Flags for 'add':
+// ... (all your other flags) ...
+  `);
 }
